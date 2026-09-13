@@ -6,7 +6,7 @@
   const el = {};
   ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "mic", "scribe",
    "settingsWrap", "settingsWin", "storeNote", "exportBtn", "copyBtn", "importFile", "importBtn", "promptBtn", "rawEditor", "clearBtn",
-   "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote", "modes", "extraLine", "keeps",
+   "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote", "modes", "extraLine", "keeps", "settingsClose",
    "settingsBtn", "toast", "toastMsg", "undoBtn", "themeName", "swatches",
    "askWrap", "ask", "askCount", "askRaw", "askOptions", "askOther", "askOtherLine", "askHint",
    "heatWin", "heatFact", "heatMonths", "heatGrid"].forEach((id) => { el[id] = document.getElementById(id); });
@@ -602,6 +602,7 @@
   function openSettings() { el.rawEditor.value = currentText(); renderSettings(); el.settingsWrap.hidden = false; el.settingsWrap.scrollTop = 0; }
   function closeSettings() { const a = document.activeElement; if (a && el.settingsWin.contains(a)) a.blur(); el.settingsWrap.hidden = true; }
   el.settingsWrap.addEventListener("click", (e) => { if (e.target === el.settingsWrap) closeSettings(); });
+  el.settingsClose.addEventListener("click", closeSettings);
   function statusWord() {
     if (store !== RemoteStore) return "paste door";
     return RemoteStore.hasAgent ? RemoteStore.via : "paste door";
@@ -688,7 +689,10 @@
     const server = RemoteStore.base || (store === RemoteStore ? location.origin : "");
     if (!s || !server) { toast("Connect needs a server. Run todo serve and open the page from it."); return; }
     const ok = await copyText(S.connectPrompt({ server, file: s.file, host: s.host }));
-    toast(ok ? "Setup copied. Paste it into your agent." : "Could not copy.");
+    if (!ok) { toast("Could not copy."); return; }
+    el.connectBtn.textContent = "command copied";
+    el.connectBtn.disabled = true;
+    setTimeout(() => { el.connectBtn.textContent = "connect agent"; el.connectBtn.disabled = false; }, 2500);
   });
   el.extraLine.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.extraLine.blur(); } e.stopPropagation(); });
   el.extraLine.addEventListener("blur", async () => {
