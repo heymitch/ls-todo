@@ -106,6 +106,13 @@ tokens — never from new hex values.
     row's free edge; it never sits between two fixed elements. Test: render
     every registered value in the slot; fixed chrome must not move a pixel.
 
+15. **Choices are rows of text, not rows of buttons.** A settings or menu window
+    is a label column and text options. The active option carries a filled
+    square (■) and the foreground color; the others carry an empty square (□)
+    and step back to faint. Actions are plain text that turns accent on hover.
+    Bordered buttons are for the one or two primary actions in a view, never
+    for a list of choices. Rows separate with `--border-subtle` hairlines.
+
 ## Layer 3 — Adding a theme
 
 A new theme is one CSS block. It cannot touch anything else:
