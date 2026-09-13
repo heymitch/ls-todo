@@ -1,0 +1,13 @@
+{
+  "name": "todo",
+  "short_name": "todo",
+  "description": "One list, one someday, one text file. Bring your agent.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a1b26",
+  "theme_color": "#1a1b26",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

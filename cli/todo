@@ -1,0 +1,422 @@
+#!/usr/bin/env node
+/* todo — the CLI door. One text file, any agent.
+   File: $TODO_FILE or ~/todo.md
+   Agent: --via <preset|command>, or $TODO_AGENT. The command gets the prompt on stdin and prints the result. */
+"use strict";
+const fs = require("fs"), path = require("path"), os = require("os"), http = require("http"), readline = require("readline");
+const { spawn, spawnSync } = require("child_process");
+
+const APP_DIR = path.join(__dirname, "..");
+const F = require(path.join(APP_DIR, "format.js"));
+const S = require(path.join(APP_DIR, "scribe.js"));
+const FILE = process.env.TODO_FILE || path.join(os.homedir(), "todo.md");
+const CONFIG = process.env.TODO_CONFIG || path.join(path.dirname(FILE), ".todo.json");
+const AGENT_TIMEOUT_MS = 240000;
+
+/* ---------------- file + config ---------------- */
+function readFile() { try { return fs.readFileSync(FILE, "utf8"); } catch (e) { return ""; } }
+function writeFile(text) { fs.mkdirSync(path.dirname(FILE), { recursive: true }); fs.writeFileSync(FILE, text); }
+function etagOf() { try { const st = fs.statSync(FILE); return '"' + Math.round(st.mtimeMs) + "-" + st.size + '"'; } catch (e) { return '"0"'; } }
+function readConfig() { try { return JSON.parse(fs.readFileSync(CONFIG, "utf8")) || {}; } catch (e) { return {}; } }
+function writeConfig(cfg) { fs.mkdirSync(path.dirname(CONFIG), { recursive: true }); fs.writeFileSync(CONFIG, JSON.stringify(cfg, null, 2) + "\n"); }
+/* "paste" means no agent on this machine: the app copies the prompt instead. */
+function commandFor(via) { return via === "paste" ? "" : (S.PRESETS[via] || via); }
+
+/* ---------------- args ---------------- */
+const BOOL = new Set(["yes", "dry", "all", "help", "h", "someday"]);
+function parseArgs(argv) {
+  const flags = {}, rest = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith("--")) {
+      const eq = a.indexOf("=");
+      const k = eq > -1 ? a.slice(2, eq) : a.slice(2);
+      if (eq > -1) flags[k] = a.slice(eq + 1);
+      else if (BOOL.has(k) || !argv[i + 1] || argv[i + 1].startsWith("--")) flags[k] = true;
+      else flags[k] = argv[++i];
+    } else rest.push(a);
+  }
+  return { flags, rest };
+}
+function agentName(via) { return via || readConfig().via || process.env.TODO_AGENT || "claude"; }
+function agentCommand(via) {
+  const cmd = commandFor(agentName(via));
+  if (!cmd) throw new Error("No agent on this machine (via = paste). Run: todo config via claude");
+  return cmd;
+}
+
+/* ---------------- agent ---------------- */
+function runAgentSync(cmd, prompt) {
+  const r = spawnSync("/bin/sh", ["-c", cmd], { input: prompt, encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: AGENT_TIMEOUT_MS });
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error("agent exited " + r.status + "\n" + String(r.stderr || "").slice(-600));
+  return r.stdout;
+}
+function runAgentAsync(cmd, prompt) {
+  return new Promise((resolve, reject) => {
+    const p = spawn("/bin/sh", ["-c", cmd], { stdio: ["pipe", "pipe", "pipe"] });
+    let out = "", err = "";
+    const timer = setTimeout(() => { p.kill("SIGKILL"); reject(new Error("agent timed out")); }, AGENT_TIMEOUT_MS);
+    p.stdout.on("data", (d) => { out += d; });
+    p.stderr.on("data", (d) => { err += d; });
+    p.on("error", (e) => { clearTimeout(timer); reject(e); });
+    p.on("close", (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error("agent exited " + code + ": " + err.slice(-600))); });
+    p.stdin.end(prompt);
+  });
+}
+
+/* ---------------- listing ---------------- */
+function enumerate(sections, includeDone) {
+  const rows = [];
+  F.sortSections(sections).forEach((s) => {
+    const items = s.items.slice().sort((a, b) => Number(a.done) - Number(b.done));
+    items.forEach((it) => { if (includeDone || !it.done) rows.push({ sec: s.day, item: it }); });
+  });
+  return rows;
+}
+function printList(sections, includeDone) {
+  const rows = enumerate(sections, includeDone);
+  if (!rows.length) { console.log("Nothing open. todo add \"a line\""); return; }
+  let last = null, n = 0;
+  rows.forEach((r) => {
+    n++;
+    if (r.sec !== last) { last = r.sec; if (r.sec === F.SOMEDAY) console.log("\nsomeday"); }
+    const it = r.item;
+    console.log(String(n).padStart(3, " ") + " [" + (it.done ? "x" : " ") + "] " + it.head + (it.raw ? "" : ""));
+    if (it.detail) console.log("        " + it.detail);
+    if (it.source) console.log("        Source: " + it.source);
+  });
+}
+function readInput(rest) {
+  if (rest[0]) return fs.readFileSync(rest[0], "utf8");
+  if (!process.stdin.isTTY) return fs.readFileSync(0, "utf8");
+  return null;
+}
+function confirm(question) {
+  return new Promise((resolve) => {
+    let input = process.stdin;
+    if (!process.stdin.isTTY) { try { input = fs.createReadStream("/dev/tty"); } catch (e) { resolve(false); return; } }
+    const rl = readline.createInterface({ input, output: process.stdout });
+    rl.question(question, (a) => { rl.close(); resolve(/^y(es)?$/i.test(a.trim())); });
+  });
+}
+function printProposal(g, asks) {
+  g.items.forEach((e, i) => {
+    console.log(String(i + 1).padStart(3, " ") + " " + (e.day === F.SOMEDAY ? "someday " : "") + F.serializeItem(e.item));
+    if (e.flags.length) console.log("      ! " + e.flags.join(" · "));
+  });
+  asks.forEach((a) => {
+    console.log("\n  ? " + a.raw);
+    a.options.forEach((o, i) => console.log("      " + (i + 1) + "  " + F.serializeItem(o)));
+    console.log("      0  keep my words");
+  });
+  console.log("\n" + g.items.length + " item(s), " + g.flagged + " flagged, " + asks.length + " question(s). Flags mark words or numbers not in your lines.");
+}
+function ask(question) {
+  return new Promise((resolve) => {
+    let input = process.stdin;
+    if (!process.stdin.isTTY) { try { input = fs.createReadStream("/dev/tty"); } catch (e) { resolve(""); return; } }
+    const rl = readline.createInterface({ input, output: process.stdout });
+    rl.question(question, (a) => { rl.close(); resolve(a.trim()); });
+  });
+}
+/* Ask each question in the terminal. Returns {chosen:[{sec, item}], keepRaw:[raw]}. --yes keeps your words. */
+async function askAll(asks, flags) {
+  const chosen = [], keepRaw = [];
+  for (const a of asks) {
+    const sec = /^\s*someday:/i.test(a.raw) ? F.SOMEDAY : F.TODO;
+    let pick = 0;
+    if (!flags.yes) {
+      console.log("\n  ? " + a.raw.replace(/^\s*someday:\s*/i, ""));
+      a.options.forEach((o, i) => console.log("      " + (i + 1) + "  " + F.serializeItem(o)));
+      const ans = await ask("      pick 1-" + a.options.length + ", or return to keep my words: ");
+      pick = parseInt(ans, 10) || 0;
+    }
+    if (pick >= 1 && pick <= a.options.length) chosen.push({ sec, item: a.options[pick - 1] });
+    else keepRaw.push(a.raw);
+  }
+  return { chosen, keepRaw };
+}
+async function scribeText(raw, flags, onCommit) {
+  const cmd = agentCommand(flags.via);
+  process.stderr.write("scribe via: " + cmd + "\n");
+  const reply = runAgentSync(cmd, S.buildPrompt(raw));
+  const cleaned = S.clean(reply);
+  const g = F.guard(raw, cleaned);
+  const asks = F.parseAsks(cleaned);
+  if (!g.items.length && !asks.length) { console.error("No items in the reply. Raw reply:\n" + reply); process.exitCode = 1; return; }
+  printProposal(g, asks);
+  if (flags.dry) return;
+  const ok = flags.yes || await confirm("Write to " + FILE + "? [y/N] ");
+  if (!ok) { console.log("Nothing written."); return; }
+  const answers = await askAll(asks, flags);
+  onCommit(g, answers);
+}
+
+/* ---------------- commands ---------------- */
+const commands = {
+  list(flags) { printList(F.parse(readFile()), !!flags.all); },
+
+  add(flags, rest) {
+    const it = F.rawLine(rest.join(" "));
+    if (!it) return usage("todo add \"a line in your own words\" [--someday] [--source ptr]");
+    if (flags.source) it.source = flags.source;
+    const sections = F.parse(readFile());
+    const sec = flags.someday || F.wantsSomeday(it.head) ? F.SOMEDAY : F.TODO;
+    const added = F.merge(sections, [{ day: sec, items: [it] }]);
+    writeFile(F.serialize(sections));
+    console.log(added ? "Added" + (sec === F.SOMEDAY ? " to someday." : ".") : "Already there.");
+  },
+
+  done(flags, rest) {
+    const n = parseInt(rest[0], 10);
+    const sections = F.parse(readFile());
+    const rows = enumerate(sections, false);
+    if (!n || !rows[n - 1]) return usage("todo done <number from todo list>");
+    rows[n - 1].item.done = true;
+    rows[n - 1].item.doneAt = F.today();
+    writeFile(F.serialize(sections));
+    console.log("Done: " + rows[n - 1].item.head);
+  },
+
+  async scribe(flags) {
+    const sections = F.parse(readFile());
+    const raw = F.rawText(sections);
+    if (!raw) { console.log("Nothing raw to scribe. Every open line is already scribed."); return; }
+    await scribeText(raw, flags, (g, answers) => {
+      const fresh = F.parse(readFile());
+      let added = F.absorb(fresh, g.days, answers.keepRaw);
+      answers.chosen.forEach((c) => { added += F.merge(fresh, [{ day: c.sec, items: [c.item] }]); });
+      writeFile(F.serialize(fresh));
+      console.log(added + " item(s) scribed in " + FILE + ".");
+    });
+  },
+
+  async capture(flags, rest) {
+    const raw = readInput(rest);
+    if (raw === null) return usage("todo capture [file] [--via claude|codex|hermes|grok|'<command>'] [--dry] [--yes]   (or pipe text on stdin)");
+    await scribeText(raw, flags, (g, answers) => {
+      const sections = F.parse(readFile());
+      let added = F.merge(sections, g.days);
+      answers.chosen.forEach((c) => { added += F.merge(sections, [{ day: c.sec, items: [c.item] }]); });
+      answers.keepRaw.forEach((r) => { const it = F.rawLine(r.replace(/^\s*someday:\s*/i, "")); if (it) added += F.merge(sections, [{ day: /^\s*someday:/i.test(r) ? F.SOMEDAY : F.TODO, items: [it] }]); });
+      writeFile(F.serialize(sections));
+      console.log(added + " item(s) written to " + FILE + ".");
+    });
+  },
+
+  prompt(flags, rest) {
+    const raw = rest[0] || !process.stdin.isTTY ? readInput(rest) : F.rawText(F.parse(readFile()));
+    if (!raw) return usage("todo prompt [file]   (default: the raw lines in your file)");
+    process.stdout.write(S.buildPrompt(raw) + "\n");
+  },
+
+  import(flags, rest) {
+    const text = readInput(rest);
+    if (text === null) return usage("todo import [file]   (items in the todo format, or pipe on stdin)");
+    const sections = F.parse(readFile());
+    const added = F.merge(sections, F.parse(S.clean(text)));
+    writeFile(F.serialize(sections));
+    console.log(added + " item(s) imported.");
+  },
+
+  raw() { process.stdout.write(readFile()); },
+  path() { console.log(FILE); },
+
+  config(flags, rest) {
+    const cfg = readConfig();
+    if (!rest.length) {
+      console.log("config      " + CONFIG);
+      console.log("via         " + (cfg.via || process.env.TODO_AGENT || "claude") + "  ->  " + (commandFor(agentName()) || "(paste door)"));
+      console.log("github      " + (cfg.github || process.env.TODO_GITHUB || "off"));
+      return;
+    }
+    const key = rest[0], value = rest.slice(1).join(" ");
+    if (key !== "via" && key !== "github") return usage("todo config [via <claude|codex|hermes|grok|paste|'command'> | github <login>]");
+    if (!value) { delete cfg[key]; } else cfg[key] = value;
+    writeConfig(cfg);
+    console.log(key + " = " + (value || "(unset)") + (key === "via" ? "  ->  " + (commandFor(value || "claude") || "(paste door)") : ""));
+    console.log("Restart todo serve to apply.");
+  },
+
+  serve(flags) {
+    const port = parseInt(flags.port || "8791", 10);
+    const host = flags.host || "127.0.0.1";
+    let viaName = flags.via || readConfig().via || process.env.TODO_AGENT || "claude";
+    let cmd = commandFor(viaName);
+    let ghUser = flags.github || readConfig().github || process.env.TODO_GITHUB || "";
+    let busy = false;
+    let ghCache = { at: 0, data: null };
+    const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, If-Match", "Access-Control-Expose-Headers": "ETag" };
+    function statusBody() {
+      return { ok: true, file: FILE, via: viaName, command: cmd, custom: !(viaName in S.PRESETS) && viaName !== "paste", presets: Object.keys(S.PRESETS).concat(["paste"]), github: ghUser, host: os.hostname() };
+    }
+    /* The app may switch between presets and the paste door. A custom command is set only on this machine: todo config via '<command>'. */
+    function applyConfig(patch) {
+      const cfg = readConfig();
+      if (patch.via !== undefined) {
+        if (!(patch.via in S.PRESETS) && patch.via !== "paste") throw new Error("Custom commands are set on the machine: todo config via '<command>'");
+        cfg.via = patch.via; viaName = patch.via; cmd = commandFor(viaName);
+      }
+      if (patch.github !== undefined) {
+        if (!/^[A-Za-z0-9-]{0,39}$/.test(patch.github)) throw new Error("That is not a GitHub login");
+        cfg.github = patch.github; ghUser = patch.github; ghCache = { at: 0, data: null };
+      }
+      writeConfig(cfg);
+      console.log(new Date().toISOString() + " config " + JSON.stringify(patch));
+    }
+    /* Real contributions by day through the GitHub CLI's login. Cached for an hour. */
+    async function github() {
+      if (!ghUser) return { user: "", days: {} };
+      if (ghCache.data && Date.now() - ghCache.at < 3600000) return ghCache.data;
+      const q = "query($u:String!){ user(login:$u){ contributionsCollection { contributionCalendar { weeks { contributionDays { date contributionCount } } } } } }";
+      const out = await new Promise((resolve, reject) => {
+        const p = spawn("gh", ["api", "graphql", "-f", "query=" + q, "-f", "u=" + ghUser], { stdio: ["ignore", "pipe", "pipe"] });
+        let o = "", e = "";
+        p.stdout.on("data", (d) => { o += d; }); p.stderr.on("data", (d) => { e += d; });
+        p.on("error", reject);
+        p.on("close", (c) => c === 0 ? resolve(o) : reject(new Error("gh exited " + c + ": " + e.slice(-300))));
+      });
+      const days = {};
+      JSON.parse(out).data.user.contributionsCollection.contributionCalendar.weeks.forEach((w) => w.contributionDays.forEach((d) => { if (d.contributionCount) days[d.date] = d.contributionCount; }));
+      ghCache = { at: Date.now(), data: { user: ghUser, days } };
+      return ghCache.data;
+    }
+    const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8", ".svg": "image/svg+xml", ".md": "text/markdown; charset=utf-8", ".css": "text/css; charset=utf-8" };
+    function send(res, code, body, type, extra) {
+      res.writeHead(code, Object.assign({ "Content-Type": type || "text/plain; charset=utf-8", "Cache-Control": "no-store" }, CORS, extra || {}));
+      res.end(body);
+    }
+    function json(res, code, obj) { send(res, code, JSON.stringify(obj), "application/json; charset=utf-8"); }
+    function body(req) { return new Promise((resolve) => { let b = ""; req.on("data", (d) => { b += d; }); req.on("end", () => resolve(b)); }); }
+
+    const server = http.createServer(async (req, res) => {
+      const p = new URL(req.url, "http://x").pathname;
+      try {
+        if (req.method === "OPTIONS") { res.writeHead(204, CORS); return res.end(); }
+        if (p === "/api/status") return json(res, 200, statusBody());
+        if (p === "/api/config" && req.method === "GET") return json(res, 200, { via: viaName, github: ghUser });
+        if (p === "/api/config" && req.method === "PUT") {
+          let patch = {};
+          try { patch = JSON.parse(await body(req)); } catch (e) { return json(res, 400, { error: "bad json" }); }
+          try { applyConfig(patch); } catch (e) { return json(res, 400, { error: e.message }); }
+          return json(res, 200, statusBody());
+        }
+        if (p === "/api/agent-test" && req.method === "POST") {
+          if (!cmd) return json(res, 400, { error: "no agent on this machine (paste door)" });
+          if (busy) return json(res, 429, { error: "busy" });
+          busy = true;
+          const t0 = Date.now();
+          try {
+            const reply = await runAgentAsync(cmd, "Reply with exactly the word OK and nothing else.");
+            const clean = reply.replace(/\x1b\[[\d;?]*[A-Za-z]/g, "").trim();
+            return json(res, 200, { ok: /\bOK\b/.test(clean), ms: Date.now() - t0, reply: clean.slice(0, 200) });
+          } catch (e) { return json(res, 502, { ok: false, ms: Date.now() - t0, error: e.message }); }
+          finally { busy = false; }
+        }
+        if (p === "/api/summary") {
+          /* For widgets: counts, the next lines, and the streak. Cheap and cacheable. */
+          const sections = F.parse(readFile());
+          const todo = sections.find((s) => s.day === F.TODO) || { items: [] };
+          const someday = sections.find((s) => s.day === F.SOMEDAY) || { items: [] };
+          const open = todo.items.filter((it) => !it.done);
+          const today = F.today();
+          const done = F.doneByDay(sections);
+          let ghDays = {};
+          try { ghDays = (await github()).days || {}; } catch (e) {}
+          let streak = 0;
+          for (let i = 0; i < 400; i++) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const iso = F.isoDate(d);
+            if ((done[iso] || 0) + (ghDays[iso] || 0) > 0) streak++;
+            else if (iso === today) continue;
+            else break;
+          }
+          return json(res, 200, {
+            open: open.length, someday: someday.items.filter((it) => !it.done).length,
+            doneToday: done[today] || 0, streak,
+            top: open.slice(0, 6).map((it) => ({ head: it.head, raw: it.raw })),
+            github: ghUser, updated: new Date().toISOString()
+          });
+        }
+        if (p === "/api/github") {
+          try { return json(res, 200, await github()); }
+          catch (e) { console.log(new Date().toISOString() + " github failed: " + e.message); return json(res, 502, { error: e.message, user: ghUser, days: {} }); }
+        }
+        if (p === "/api/file" && req.method === "GET") return send(res, 200, readFile(), "text/plain; charset=utf-8", { ETag: etagOf() });
+        if (p === "/api/file" && req.method === "PUT") {
+          const match = req.headers["if-match"];
+          if (match && match !== "*" && match !== etagOf()) return json(res, 409, { error: "file changed" });
+          writeFile(F.serialize(F.parse(await body(req))));
+          return send(res, 200, "ok", "text/plain", { ETag: etagOf() });
+        }
+        if (p === "/api/scribe" && req.method === "POST") {
+          if (!cmd) return json(res, 400, { error: "no agent on this machine: pick one in settings or use the paste door" });
+          if (busy) return json(res, 429, { error: "scribe is busy with another capture" });
+          let raw = "";
+          try { raw = String(JSON.parse(await body(req)).raw || "").trim(); } catch (e) { return json(res, 400, { error: "bad json" }); }
+          if (!raw) return json(res, 400, { error: "empty capture" });
+          busy = true;
+          const started = Date.now();
+          try {
+            const reply = await runAgentAsync(cmd, S.buildPrompt(raw));
+            const cleaned = S.clean(reply);
+            console.log(new Date().toISOString() + " scribe " + raw.length + " chars -> " + F.guard(raw, cleaned).items.length + " items in " + ((Date.now() - started) / 1000).toFixed(1) + "s");
+            return json(res, 200, { reply, cleaned });
+          } catch (e) {
+            console.log(new Date().toISOString() + " scribe failed: " + e.message);
+            return json(res, 502, { error: e.message });
+          } finally { busy = false; }
+        }
+        let rel = p === "/" ? "index.html" : decodeURIComponent(p.slice(1));
+        const abs = path.normalize(path.join(APP_DIR, rel));
+        if (!abs.startsWith(APP_DIR + path.sep) || rel.startsWith("cli/") || rel.startsWith("test/")) return send(res, 404, "not found");
+        if (!fs.existsSync(abs) || fs.statSync(abs).isDirectory()) return send(res, 404, "not found");
+        return send(res, 200, fs.readFileSync(abs), TYPES[path.extname(abs)] || "application/octet-stream");
+      } catch (e) {
+        return json(res, 500, { error: e.message });
+      }
+    });
+    server.listen(port, host, () => {
+      console.log("todo serve  http://" + host + ":" + port + "/");
+      console.log("file        " + FILE);
+      console.log("scribe via  " + viaName + (cmd ? "  ->  " + cmd : "  (paste door)"));
+      console.log("github      " + (ghUser || "off"));
+      console.log("config      " + CONFIG);
+    });
+  },
+
+  help() {
+    console.log([
+      "todo — one list, one someday, one text file. Bring your agent.",
+      "",
+      "  todo                      list open items, numbered",
+      "  todo list --all           include done items",
+      "  todo add \"a line\" [--someday] [--source ptr]",
+      "  todo done <n>",
+      "  todo scribe [--via claude|codex|hermes|grok|'<cmd>'] [--dry] [--yes]",
+      "                            rewrite the raw lines already in the file, in place",
+      "  todo capture [file]       rewrite outside text with your agent and add the result",
+      "  todo prompt [file]        print the scribe prompt (default: your raw lines)",
+      "  todo import [file]        merge items already in the todo format",
+      "  todo serve [--port 8791] [--host 127.0.0.1] [--via claude] [--github login]",
+      "  todo config [via <preset|'command'> | github <login>]",
+      "  todo raw | todo path",
+      "",
+      "File: $TODO_FILE or ~/todo.md. Config: ~/.todo.json next to it. Agent commands read the",
+      "prompt on stdin. A line with someday, maybe, sometime, eventually, or later goes under Someday."
+    ].join("\n"));
+  }
+};
+
+function usage(u) { console.error("usage: " + u); process.exitCode = 2; }
+function fail(m) { console.error(m); process.exitCode = 1; }
+
+(async function main() {
+  const { flags, rest } = parseArgs(process.argv.slice(2));
+  const name = rest.shift() || "list";
+  if (flags.help || flags.h || name === "help" || name === "--help") return commands.help();
+  const cmd = commands[name];
+  if (!cmd) { console.error("unknown command: " + name); return commands.help(); }
+  try { await cmd(flags, rest); } catch (e) { fail(e.message); }
+})();

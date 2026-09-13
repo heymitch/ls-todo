@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>todo</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="todo">
+<meta name="theme-color" content="#1a1b26">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap">
+<style>
+/* ================================================================
+   OMARCHY-WEB v1 — themes are data, structure is law.
+   Layer 1: 12 role tokens. Components may only reference these.
+   ================================================================ */
+/* Default before JS runs: tokyo-night. */
+:root {
+  --bg: #1a1b26; --bg-alt: #16161e; --border: #3b4261;
+  --fg: #c0caf5; --fg-muted: #a9b1d6; --fg-faint: #565f89;
+  --accent: #7aa2f7; --accent-2: #bb9af7;
+  --ok: #9ece6a; --warn: #e0af68; --err: #f7768e;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="heymitch"] {
+  --bg: #1c1612; --bg-alt: #262019; --border: #4a3a2a;
+  --fg: #f0e4d0; --fg-muted: #c8b89c; --fg-faint: #9a8a70;
+  --accent: #e8682a; --accent-2: #4a9db8;
+  --ok: #82c896; --warn: #ffb86c; --err: #ff5555;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="tokyo-night"] {
+  --bg: #1a1b26; --bg-alt: #16161e; --border: #3b4261;
+  --fg: #c0caf5; --fg-muted: #a9b1d6; --fg-faint: #565f89;
+  --accent: #7aa2f7; --accent-2: #bb9af7;
+  --ok: #9ece6a; --warn: #e0af68; --err: #f7768e;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="gruvbox"] {
+  --bg: #282828; --bg-alt: #1d2021; --border: #504945;
+  --fg: #ebdbb2; --fg-muted: #d5c4a1; --fg-faint: #928374;
+  --accent: #fe8019; --accent-2: #83a598;
+  --ok: #b8bb26; --warn: #fabd2f; --err: #fb4934;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="catppuccin"] {
+  --bg: #1e1e2e; --bg-alt: #181825; --border: #45475a;
+  --fg: #cdd6f4; --fg-muted: #bac2de; --fg-faint: #7f849c;
+  --accent: #cba6f7; --accent-2: #89b4fa;
+  --ok: #a6e3a1; --warn: #f9e2af; --err: #f38ba8;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="nord"] {
+  --bg: #2e3440; --bg-alt: #3b4252; --border: #4c566a;
+  --fg: #eceff4; --fg-muted: #d8dee9; --fg-faint: #94a3bd;
+  --accent: #88c0d0; --accent-2: #81a1c1;
+  --ok: #a3be8c; --warn: #ebcb8b; --err: #bf616a;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="everforest"] {
+  --bg: #2d353b; --bg-alt: #232a2e; --border: #475258;
+  --fg: #d3c6aa; --fg-muted: #9da9a0; --fg-faint: #859289;
+  --accent: #a7c080; --accent-2: #7fbbb3;
+  --ok: #83c092; --warn: #dbbc7f; --err: #e67e80;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="rose-pine"] {
+  --bg: #191724; --bg-alt: #1f1d2e; --border: #403d52;
+  --fg: #e0def4; --fg-muted: #908caa; --fg-faint: #6e6a86;
+  --accent: #ebbcba; --accent-2: #c4a7e7;
+  --ok: #9ccfd8; --warn: #f6c177; --err: #eb6f92;
+  --sel: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+:root[data-palette="latte"] {
+  --bg: #eff1f5; --bg-alt: #e6e9ef; --border: #bcc0cc;
+  --fg: #4c4f69; --fg-muted: #5c5f77; --fg-faint: #8c8fa1;
+  --accent: #8839ef; --accent-2: #1e66f5;
+  --ok: #40a02b; --warn: #df8e1d; --err: #d20f39;
+  --sel: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* ================================================================
+   Layer 2: STRUCTURE. Fixed for every theme. No hex below this line.
+   One window. One list. One someday. Boxes, not brackets.
+   ================================================================ */
+:root {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s1: .5rem; --s2: 1rem; --s3: 1.5rem;
+  --gap: 12px;
+  --radius: 0;
+  --border-subtle: color-mix(in srgb, var(--border) 55%, transparent);
+}
+* { box-sizing: border-box; }
+html { height: 100%; }
+body {
+  margin: 0; min-height: 100%;
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-mono); font-size: 16px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+body, .win, .bar, button, textarea, .line, .box::before {
+  transition: background-color 80ms linear, border-color 80ms linear, color 80ms linear, opacity 80ms linear;
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+::selection { background: var(--sel); }
+a { color: var(--accent); text-decoration: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+button, textarea { font: inherit; color: inherit; border-radius: var(--radius); }
+button {
+  background: var(--bg); border: 1px solid var(--border); color: var(--fg-muted);
+  padding: .5rem .9rem; cursor: pointer; font-size: .82rem; line-height: 1.2; min-height: 40px;
+}
+button:hover { border-color: var(--accent); color: var(--fg); }
+button.primary { border-color: var(--accent); color: var(--accent); }
+button.primary:hover { background: var(--accent); color: var(--bg); }
+button.live { border-color: var(--err); color: var(--err); }
+button:disabled { opacity: .5; cursor: default; }
+/* Editable text stays at 16px or larger: below that, iOS zooms the page when the keyboard opens. */
+textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); padding: .8rem .9rem; line-height: 1.6; resize: vertical; font-size: 16px; }
+textarea:focus { border-color: var(--accent); outline: none; }
+
+/* ---- Bar ---- */
+.bar {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--bg-alt); border-bottom: 1px solid var(--border);
+  font-size: .78rem; padding: .55rem var(--gap);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s2);
+}
+.brand { font-weight: 700; color: var(--fg); letter-spacing: .02em; }
+.brand span { color: var(--accent); }
+.bar-right { display: flex; align-items: center; gap: var(--s2); }
+.bar .fact { color: var(--fg-faint); min-width: 7ch; text-align: right; font-variant-numeric: tabular-nums; }
+.bar button { min-height: 0; padding: .3rem .6rem; font-size: .75rem; }
+
+/* ---- Desk: one window on the wallpaper ---- */
+.desk { display: grid; grid-template-columns: 1fr; gap: var(--gap); padding: var(--gap); align-items: start; }
+@media (min-width: 880px) {
+  .desk { grid-template-columns: minmax(0, 680px) minmax(0, 1fr); }
+  #listWin { grid-column: 1; }
+  #settingsWin { grid-column: 2; grid-row: 1; }
+}
+.win { background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s1) var(--s2) var(--s2); }
+.win:focus-within { border-color: var(--accent); }
+.win-body { display: grid; gap: var(--s2); padding-top: var(--s1); }
+.row { display: flex; gap: var(--s1); flex-wrap: wrap; }
+.note { margin: 0; font-size: .78rem; color: var(--fg-faint); }
+.note b { color: var(--fg-muted); font-weight: 500; }
+
+/* ---- The list: a note that knows what a checkbox is ---- */
+.list { display: grid; }
+.item { display: grid; grid-template-columns: 44px 1fr; align-items: start; }
+.box { width: 44px; height: 44px; padding: 0; border: 0; background: transparent; position: relative; cursor: pointer; min-height: 0; }
+.box::before {
+  content: ""; position: absolute; left: 12px; top: 13px; width: 17px; height: 17px;
+  border: 1.5px solid var(--fg-muted); background: transparent;
+}
+.box:hover::before { border-color: var(--accent); }
+.item.done .box::before { background: var(--fg-faint); border-color: var(--fg-faint); }
+.item.new .box { cursor: default; }
+.item.new .box::before { border-color: var(--border); }
+.line { min-height: 44px; padding: .55rem .3rem .55rem 0; outline: none; overflow-wrap: anywhere; white-space: pre-wrap; -webkit-user-modify: read-write-plaintext-only; font-size: 16px; }
+.line:empty::before { content: attr(data-placeholder); color: var(--fg-faint); }
+.line:focus { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.line b { font-weight: 700; color: var(--fg); }
+.line .d { color: var(--fg-muted); font-size: .9rem; }
+.line .s { color: var(--fg-faint); font-size: .78rem; }
+.item.done .line, .item.done .line b { color: var(--fg-faint); font-weight: 500; }
+.item.done .line .d, .item.done .line .s { color: var(--fg-faint); }
+.someday { margin-top: var(--s1); border-top: 1px solid var(--border-subtle); padding-top: var(--s1); }
+.someday .label { font-size: .72rem; color: var(--fg-faint); letter-spacing: .06em; padding: .2rem 0 .1rem 12px; }
+.someday .line { color: var(--fg-muted); }
+mark { background: color-mix(in srgb, var(--warn) 22%, transparent); color: inherit; text-decoration: underline; text-decoration-color: var(--warn); text-underline-offset: 3px; }
+.tools { display: flex; justify-content: flex-end; align-items: center; gap: .5rem; margin-top: var(--s1); }
+.tools .status { margin-right: auto; font-size: .72rem; color: var(--fg-faint); padding-left: 12px; }
+.tools .status.busy { color: var(--warn); }
+.tools .status.err { color: var(--err); }
+.tools .status.ok { color: var(--fg-faint); }
+.tools button { min-height: 36px; padding: .3rem .8rem; font-size: .78rem; }
+
+/* ---- Settings: a config file, rendered ---- */
+.set { display: grid; padding: var(--s1) 0 0; }
+.set-row { display: grid; grid-template-columns: 7ch 1fr; gap: .4rem .6rem; align-items: start; padding: .45rem 0; }
+.set-row .k { color: var(--fg-faint); font-size: .78rem; padding-top: .6rem; }
+.set-row .v { display: grid; gap: .5rem; min-width: 0; }
+.set-row .v .line { min-height: 40px; padding: .5rem .3rem; border-bottom: 1px solid var(--border-subtle); }
+.presets { display: flex; flex-wrap: wrap; gap: .4rem; }
+.presets button { min-height: 34px; padding: .25rem .7rem; font-size: .78rem; }
+.presets button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.presets button.test { margin-left: auto; }
+.status-ok { color: var(--ok); } .status-err { color: var(--err); } .status-busy { color: var(--warn); }
+.theme-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding-top: .45rem; }
+.swatches { display: flex; gap: 6px; align-items: center; }
+.swatch { width: 18px; height: 18px; padding: 0; min-height: 0; border: 1px solid var(--border); background: var(--sw-bg); position: relative; cursor: pointer; }
+.swatch::after { content: ""; position: absolute; inset: 5px; background: var(--sw-ac); }
+.swatch:hover { border-color: var(--accent); }
+.swatch[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.theme-readout { font-size: .78rem; color: var(--fg-faint); }
+.theme-readout b { color: var(--fg); font-weight: 500; display: inline-block; min-width: 11ch; }
+.theme-row .hint { font-size: .72rem; }
+@media (max-width: 640px) { .theme-row .hint { display: none; } }
+.serverline { font-size: .85rem; color: var(--fg-muted); overflow-wrap: anywhere; padding-top: .45rem; }
+.serverline b { color: var(--fg); font-weight: 500; }
+
+/* ---- Heat: a year of checked boxes and commits, pinned to the bottom of the screen ---- */
+:root { --safe-bottom: env(safe-area-inset-bottom, 0px); }
+.heat { padding: var(--s1) var(--s2) var(--s2); position: fixed; left: var(--gap); right: var(--gap); bottom: calc(var(--gap) + var(--safe-bottom)); z-index: 5; }
+/* On touch devices JS pins the top to the remembered screen bottom, so a keyboard slides over the chart instead of lifting it. */
+body.kb-aware .heat { bottom: auto; }
+.heat-strip { display: flex; justify-content: space-between; font-size: .72rem; color: var(--fg-faint); padding: .2rem 0 .55rem; }
+.heat-strip .path { color: var(--accent-2); }
+.heat-strip .fact { font-variant-numeric: tabular-nums; text-align: right; }
+.heat-months { display: grid; grid-auto-flow: column; font-size: .62rem; line-height: 1; color: var(--fg-faint); height: .75rem; margin-bottom: 4px; }
+.heat-months span { white-space: nowrap; overflow: visible; }
+.heat-grid { display: grid; grid-auto-flow: column; }
+.cell { background: color-mix(in srgb, var(--border) 45%, var(--bg)); cursor: default; }
+.cell[data-l="1"] { background: color-mix(in srgb, var(--accent) 28%, var(--bg)); }
+.cell[data-l="2"] { background: color-mix(in srgb, var(--accent) 52%, var(--bg)); }
+.cell[data-l="3"] { background: color-mix(in srgb, var(--accent) 76%, var(--bg)); }
+.cell[data-l="4"] { background: var(--accent); }
+.cell.future { visibility: hidden; }
+.cell.today { outline: 1px solid var(--fg); outline-offset: -1px; }
+.cell:hover { outline: 1px solid var(--fg); outline-offset: -1px; }
+.heat-legend { display: flex; align-items: center; gap: 3px; justify-content: flex-end; font-size: .62rem; color: var(--fg-faint); margin-top: 6px; }
+.heat-legend .cell { width: 9px; height: 9px; }
+.heat-legend span { margin: 0 4px; }
+
+/* ---- Ask: an omarchy menu, not a dialog ---- */
+.askwrap { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 72%, transparent); display: flex; align-items: center; justify-content: center; padding: var(--gap); }
+.ask { width: 100%; max-width: 560px; border-color: var(--accent); padding: 0; }
+.ask-strip { display: flex; justify-content: space-between; padding: .45rem .9rem; border-bottom: 1px solid var(--border-subtle); font-size: .72rem; color: var(--fg-faint); }
+.ask-strip .path { color: var(--accent); }
+.ask-raw { padding: .8rem .9rem .5rem; color: var(--fg-muted); overflow-wrap: anywhere; }
+.ask-options { display: grid; }
+.opt { display: grid; grid-template-columns: 44px 1fr; align-items: start; padding: .5rem .9rem .5rem 0; cursor: pointer; border: 0; background: transparent; text-align: left; color: var(--fg); font: inherit; line-height: 1.6; min-height: 44px; }
+.opt .n { color: var(--fg-faint); text-align: center; font-variant-numeric: tabular-nums; }
+.opt .t { overflow-wrap: anywhere; }
+.opt .t b { font-weight: 700; }
+.opt .t .d { color: var(--fg-muted); font-size: .9rem; }
+.opt:hover, .opt.hi { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.opt.other .t { color: var(--fg-muted); }
+.ask-other { padding: 0 .9rem .4rem 44px; }
+.ask-other .line { border-bottom: 1px solid var(--border); min-height: 40px; padding-top: .3rem; padding-bottom: .3rem; }
+.ask-hint { padding: .5rem .9rem .6rem; font-size: .72rem; color: var(--fg-faint); border-top: 1px solid var(--border-subtle); }
+.askwrap:not([hidden]) ~ .desk, body:has(.askwrap:not([hidden])) .desk { opacity: .85; }
+
+/* ---- Toast ---- */
+.toast {
+  position: fixed; left: var(--gap); right: var(--gap); top: calc(44px + var(--gap) + env(safe-area-inset-top, 0px));
+  z-index: 20; background: var(--bg-alt); border: 1px solid var(--accent);
+  padding: .6rem .9rem; font-size: .82rem; display: flex; justify-content: space-between; gap: var(--s2); align-items: center;
+}
+.toast button { min-height: 0; padding: .3rem .6rem; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <span class="brand">to<span>do</span></span>
+  <div class="bar-right">
+    <span class="fact" id="openCount">0 open</span>
+    <button type="button" id="settingsBtn">settings</button>
+  </div>
+</header>
+
+<main class="desk">
+  <section class="win" id="listWin" aria-label="Items">
+    <div class="list" id="todo"></div>
+    <div class="list someday" id="someday" hidden>
+      <div class="label">someday</div>
+      <div id="somedayItems"></div>
+    </div>
+    <div class="tools">
+      <span class="status" id="scribeStatus"></span>
+      <button type="button" id="mic">mic</button>
+      <button type="button" id="scribe" class="primary">scribe</button>
+    </div>
+  </section>
+
+  <section class="win heat" id="heatWin" aria-label="Done, by day">
+    <div class="heat-strip"><span class="path">~/done</span><span class="fact" id="heatFact"></span></div>
+    <div class="heat-months" id="heatMonths"></div>
+    <div class="heat-grid" id="heatGrid"></div>
+    <div class="heat-legend" id="heatLegend"><span>less</span><div class="cell" data-l="0"></div><div class="cell" data-l="1"></div><div class="cell" data-l="2"></div><div class="cell" data-l="3"></div><div class="cell" data-l="4"></div><span>more</span></div>
+  </section>
+
+  <section class="win" id="settingsWin" aria-label="Settings" hidden>
+    <div class="set">
+      <div class="set-row">
+        <span class="k">agent</span>
+        <div class="v">
+          <div class="presets" id="presets" role="group" aria-label="Scribe agent"></div>
+          <div class="note" id="agentNote"></div>
+        </div>
+      </div>
+      <div class="set-row">
+        <span class="k">github</span>
+        <div class="v"><div class="line one" id="githubLine" contenteditable="plaintext-only" data-placeholder="login, for the heat map"></div></div>
+      </div>
+      <div class="set-row">
+        <span class="k">server</span>
+        <div class="v" id="serverV"></div>
+      </div>
+      <div class="set-row">
+        <span class="k">theme</span>
+        <div class="v theme-row">
+          <div class="swatches" id="swatches" role="group" aria-label="Switch theme"></div>
+          <span class="theme-readout"><b id="themeName"></b></span>
+          <span class="hint"><kbd>T</kbd> cycles</span>
+        </div>
+      </div>
+      <div class="set-row">
+        <span class="k">file</span>
+        <div class="v">
+          <div class="row">
+            <button type="button" id="exportBtn">export</button>
+            <button type="button" id="copyBtn">copy</button>
+            <input type="file" id="importFile" accept=".md,.txt,text/plain,text/markdown" hidden>
+            <button type="button" id="importBtn">import</button>
+            <button type="button" id="promptBtn">copy prompt</button>
+            <button type="button" id="clearBtn">delete all</button>
+          </div>
+          <textarea id="rawEditor" rows="8" spellcheck="false"></textarea>
+          <p class="note" id="storeNote"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="askwrap" id="askWrap" hidden>
+  <section class="win ask" id="ask" role="dialog" aria-modal="true" aria-label="Scribe asks">
+    <div class="ask-strip"><span class="path">scribe asks</span><span class="fact" id="askCount"></span></div>
+    <div class="ask-raw" id="askRaw"></div>
+    <div class="ask-options" id="askOptions"></div>
+    <div class="ask-other" id="askOther" hidden><div class="line" id="askOtherLine" contenteditable="plaintext-only" data-placeholder="say it your way, then return"></div></div>
+    <div class="ask-hint" id="askHint"></div>
+  </section>
+</div>
+
+<div class="toast" id="toast" hidden><span id="toastMsg"></span><button type="button" id="undoBtn" hidden>undo</button></div>
+
+<script src="format.js"></script>
+<script src="scribe.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

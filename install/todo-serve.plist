@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- macOS: keep `todo serve` running at login.
+     1. Replace /Users/YOU and the node path (`which node`).
+     2. cp install/todo-serve.plist ~/Library/LaunchAgents/todo-serve.plist
+     3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/todo-serve.plist
+     Logs: ~/Library/Logs/todo-serve.log. Restart after changing the code:
+     launchctl kickstart -k gui/$(id -u)/todo-serve -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>todo-serve</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/YOU/todo/cli/todo</string>
+    <string>serve</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/YOU/todo</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/YOU/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HOME</key>
+    <string>/Users/YOU</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/YOU/Library/Logs/todo-serve.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOU/Library/Logs/todo-serve.log</string>
+</dict>
+</plist>

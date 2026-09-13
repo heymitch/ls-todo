@@ -1,0 +1,19 @@
+# Linux (systemd user unit): keep `todo serve` running at login.
+#   1. Replace /home/YOU and the node path (`which node`).
+#   2. mkdir -p ~/.config/systemd/user && cp install/todo-serve.service ~/.config/systemd/user/
+#   3. systemctl --user daemon-reload && systemctl --user enable --now todo-serve
+#   Logs: journalctl --user -u todo-serve -f. Restart after changing the code: systemctl --user restart todo-serve
+#   To keep it running when you are logged out: loginctl enable-linger $USER
+
+[Unit]
+Description=todo serve
+
+[Service]
+ExecStart=/usr/bin/node /home/YOU/todo/cli/todo serve
+WorkingDirectory=/home/YOU/todo
+Environment=PATH=/home/YOU/.local/bin:/usr/local/bin:/usr/bin:/bin
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
