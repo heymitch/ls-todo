@@ -197,7 +197,7 @@ mark { background: color-mix(in srgb, var(--warn) 22%, transparent); color: inhe
 .opts { display: flex; flex-wrap: wrap; gap: 0 1.1rem; }
 .opt-t, .act {
   background: none; border: 0; padding: .45rem 0; min-height: 0; font-size: 1rem; line-height: 1.6;
-  color: var(--fg-faint); cursor: pointer; text-align: left; white-space: nowrap;
+  color: var(--fg-faint); cursor: pointer; text-align: left; white-space: normal; max-width: 100%;
 }
 .opt-t::before { content: "□ "; }
 .opt-t[aria-pressed="true"] { color: var(--fg); }
