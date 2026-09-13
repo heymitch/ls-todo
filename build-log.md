@@ -55,3 +55,17 @@ Uncommitted at session end:
  test/format.test.js | 31 ++++++++++++++++++++
  6 files changed, 205 insertions(+), 47 deletions(-)
 ```
+
+## 2026-09-13 13:08  (main, 0 uncommitted)
+
+Recent commits:
+```
+935a3c7 long option labels wrap on the phone
+3ce4dbf settings on the phone: a close button in the strip, connect agent as a real button that reports command copied, options one step larger
+68405f1 design rule 15: choices are rows of text, not rows of buttons
+e4bf596 settings is an omarchy menu: text options with one marker, hairline rows, no bordered buttons
+9b2c085 scribe takes a chosen action and your own instruction; done lines keep for a chosen time; Done stamps carry the time
+a9765d8 settings overlay sits above the top bar
+d58189f settings floats like the ask menu: dimmed backdrop, heat card steps out, tap outside or escape closes
+50d01c5 scribe breaks big lines into smaller outcomes; connect brief for agents; README explains Tailscale and the three agent doors
+```

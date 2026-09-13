@@ -4,7 +4,7 @@
   "use strict";
   const F = window.TodoFormat, S = window.TodoScribe;
   const el = {};
-  ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "mic", "scribe",
+  ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "scribe",
    "settingsWrap", "settingsWin", "storeNote", "exportBtn", "copyBtn", "importFile", "importBtn", "promptBtn", "rawEditor", "clearBtn",
    "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote", "modes", "extraLine", "keeps", "settingsClose",
    "settingsBtn", "toast", "toastMsg", "undoBtn", "themeName", "swatches",
@@ -568,31 +568,6 @@
     const raw = F.rawItems(sections).filter((it) => it.id !== id).map(F.plainItem).join("\n");
     removeItem(id);
     applyScribe(raw, text);
-  }
-
-  /* ---------------- Speech: dictate into the add line ---------------- */
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { el.mic.hidden = true; }
-  else {
-    let rec = null, listening = false;
-    el.mic.addEventListener("click", () => {
-      if (listening) { rec.stop(); return; }
-      rec = new SR();
-      rec.lang = navigator.language || "en-US";
-      rec.interimResults = false; rec.continuous = true;
-      rec.onresult = (ev) => {
-        let t = "";
-        for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) t += ev.results[i][0].transcript + " ";
-        if (!t.trim()) return;
-        const line = el.todo.querySelector(".item.new .line");
-        line.textContent = (lineText(line).trim() + " " + t.trim()).trim();
-        commitLine(line, true);
-      };
-      rec.onend = () => { listening = false; el.mic.textContent = "mic"; el.mic.classList.remove("live"); };
-      rec.onerror = (e) => { toast("mic: " + e.error); };
-      try { rec.start(); listening = true; el.mic.textContent = "stop"; el.mic.classList.add("live"); }
-      catch (e) { toast("mic: " + e.message); }
-    });
   }
 
   /* ---------------- Settings: a config file, rendered ---------------- */
