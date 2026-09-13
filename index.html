@@ -181,29 +181,43 @@ mark { background: color-mix(in srgb, var(--warn) 22%, transparent); color: inhe
 .tools .status.ok { color: var(--fg-faint); }
 .tools button { min-height: 36px; padding: .3rem .8rem; font-size: .78rem; }
 
-/* ---- Settings: a config file, rendered ---- */
-.set { display: grid; padding: var(--s1) 0 0; }
-.set-row { display: grid; grid-template-columns: 7ch 1fr; gap: .4rem .6rem; align-items: start; padding: .45rem 0; }
-.set-row .k { color: var(--fg-faint); font-size: .78rem; padding-top: .6rem; }
-.set-row .v { display: grid; gap: .5rem; min-width: 0; }
-.set-row .v .line { min-height: 40px; padding: .5rem .3rem; border-bottom: 1px solid var(--border-subtle); }
-.presets { display: flex; flex-wrap: wrap; gap: .4rem; }
-.presets button { min-height: 34px; padding: .25rem .7rem; font-size: .78rem; }
-.presets button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
-.presets button.test { margin-left: auto; }
+/* ---- Settings: an omarchy menu. Label column, text options, one marker, hairlines between rows. ---- */
+#settingsWin { padding: 0; }
+.set { display: grid; padding: 0 var(--s2) var(--s1); }
+.set-row { display: grid; grid-template-columns: 7ch 1fr; gap: .2rem .6rem; align-items: start; padding: .6rem 0; border-top: 1px solid var(--border-subtle); }
+.set-row:first-child { border-top: 0; }
+.set-row .k { color: var(--fg-faint); font-size: .78rem; padding-top: .35rem; }
+.set-row .v { display: grid; gap: .3rem; min-width: 0; }
+.set-row .v .line { min-height: 36px; padding: .3rem 0; font-size: .95rem; }
+.set-row .note { font-size: .75rem; }
+/* Options are text. The active one is marked with a filled square, in the foreground color; the rest step back. */
+.opts { display: flex; flex-wrap: wrap; gap: 0 1.1rem; }
+.opt-t, .act {
+  background: none; border: 0; padding: .3rem 0; min-height: 0; font-size: .9rem; line-height: 1.6;
+  color: var(--fg-faint); cursor: pointer; text-align: left; white-space: nowrap;
+}
+.opt-t::before { content: "□ "; }
+.opt-t[aria-pressed="true"] { color: var(--fg); }
+.opt-t[aria-pressed="true"]::before { content: "■ "; }
+.opt-t:hover, .act:hover { color: var(--accent); }
+.opt-t:disabled { cursor: default; color: var(--fg-faint); }
+.act { color: var(--fg-muted); }
+.act.danger:hover { color: var(--err); }
+.act:disabled { color: var(--fg-faint); cursor: default; }
 .status-ok { color: var(--ok); } .status-err { color: var(--err); } .status-busy { color: var(--warn); }
-.theme-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding-top: .45rem; }
+.theme-row { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; padding-top: .3rem; }
 .swatches { display: flex; gap: 6px; align-items: center; }
 .swatch { width: 18px; height: 18px; padding: 0; min-height: 0; border: 1px solid var(--border); background: var(--sw-bg); position: relative; cursor: pointer; }
 .swatch::after { content: ""; position: absolute; inset: 5px; background: var(--sw-ac); }
 .swatch:hover { border-color: var(--accent); }
-.swatch[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.swatch[aria-pressed="true"] { outline: 1px solid var(--fg); outline-offset: 1px; }
 .theme-readout { font-size: .78rem; color: var(--fg-faint); }
 .theme-readout b { color: var(--fg); font-weight: 500; display: inline-block; min-width: 11ch; }
 .theme-row .hint { font-size: .72rem; }
 @media (max-width: 640px) { .theme-row .hint { display: none; } }
-.serverline { font-size: .85rem; color: var(--fg-muted); overflow-wrap: anywhere; padding-top: .45rem; }
+.serverline { font-size: .85rem; color: var(--fg-muted); overflow-wrap: anywhere; padding-top: .3rem; }
 .serverline b { color: var(--fg); font-weight: 500; }
+#rawEditor { margin-top: .3rem; }
 
 /* ---- Heat: a year of checked boxes and commits, pinned to the bottom of the screen ---- */
 :root { --safe-bottom: env(safe-area-inset-bottom, 0px); }
@@ -298,26 +312,27 @@ body:has(.askwrap:not([hidden])) .desk { opacity: .85; }
 
   <div class="askwrap" id="settingsWrap" hidden>
   <section class="win floating" id="settingsWin" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="ask-strip"><span class="path">~/settings</span><span class="fact"><kbd>esc</kbd> closes</span></div>
     <div class="set">
       <div class="set-row">
         <span class="k">agent</span>
         <div class="v">
-          <div class="presets" id="presets" role="group" aria-label="Scribe agent"></div>
+          <div class="opts" id="presets" role="group" aria-label="Scribe agent"></div>
           <div class="note" id="agentNote"></div>
         </div>
       </div>
       <div class="set-row">
         <span class="k">scribe</span>
         <div class="v">
-          <div class="presets" id="modes" role="group" aria-label="What the scribe does"></div>
-          <div class="line one" id="extraLine" contenteditable="plaintext-only" data-placeholder="your own instruction, e.g. headlines under six words"></div>
+          <div class="opts" id="modes" role="group" aria-label="What the scribe does"></div>
+          <div class="line one" id="extraLine" contenteditable="plaintext-only" data-placeholder="add your own instruction"></div>
         </div>
       </div>
       <div class="set-row">
         <span class="k">done</span>
         <div class="v">
-          <div class="presets" id="keeps" role="group" aria-label="How long done lines stay"></div>
-          <p class="note">How long a checked line stays in the list. It always stays in the file and on the heat map.</p>
+          <div class="opts" id="keeps" role="group" aria-label="How long done lines stay"></div>
+          <p class="note">how long a checked line stays in the list. it stays in the file and on the map regardless.</p>
         </div>
       </div>
       <div class="set-row">
@@ -331,8 +346,8 @@ body:has(.askwrap:not([hidden])) .desk { opacity: .85; }
       <div class="set-row">
         <span class="k">connect</span>
         <div class="v">
-          <div class="row"><button type="button" id="connectBtn">copy setup</button></div>
-          <p class="note" id="connectNote">Paste it into any agent that can reach the server: Claude Code, Codex, Hermes, or an agent on another machine over Tailscale. It learns the file, the format, and the API, then proves the connection.</p>
+          <div class="opts"><button type="button" class="act" id="connectBtn">copy setup</button></div>
+          <p class="note" id="connectNote">paste it into any agent that can reach the server. it learns the file, the format, and the API, then proves the connection.</p>
         </div>
       </div>
       <div class="set-row">
@@ -346,13 +361,13 @@ body:has(.askwrap:not([hidden])) .desk { opacity: .85; }
       <div class="set-row">
         <span class="k">file</span>
         <div class="v">
-          <div class="row">
-            <button type="button" id="exportBtn">export</button>
-            <button type="button" id="copyBtn">copy</button>
+          <div class="opts">
+            <button type="button" class="act" id="exportBtn">export</button>
+            <button type="button" class="act" id="copyBtn">copy</button>
             <input type="file" id="importFile" accept=".md,.txt,text/plain,text/markdown" hidden>
-            <button type="button" id="importBtn">import</button>
-            <button type="button" id="promptBtn">copy prompt</button>
-            <button type="button" id="clearBtn">delete all</button>
+            <button type="button" class="act" id="importBtn">import</button>
+            <button type="button" class="act" id="promptBtn">copy prompt</button>
+            <button type="button" class="act danger" id="clearBtn">delete all</button>
           </div>
           <textarea id="rawEditor" rows="8" spellcheck="false"></textarea>
           <p class="note" id="storeNote"></p>

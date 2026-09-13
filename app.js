@@ -612,7 +612,7 @@
     const names = (s && s.presets) || ["claude", "codex", "hermes", "grok", "paste"];
     names.forEach((name) => {
       const b = document.createElement("button");
-      b.type = "button"; b.textContent = name;
+      b.type = "button"; b.className = "opt-t"; b.textContent = name;
       b.setAttribute("aria-pressed", String(!!s && s.via === name));
       b.disabled = !s;
       b.addEventListener("click", () => setAgent(name));
@@ -620,18 +620,19 @@
     });
     if (s && s.command) {
       const t = document.createElement("button");
-      t.type = "button"; t.className = "test"; t.textContent = "test";
+      t.type = "button"; t.className = "act test"; t.textContent = "test";
       t.addEventListener("click", testAgent);
       el.presets.appendChild(t);
     }
-    if (!s) el.agentNote.textContent = "No server. The scribe copies its prompt for the AI you carry; paste the reply into a line.";
-    else if (!s.command) el.agentNote.textContent = "Paste door: the scribe copies its prompt for the AI you carry.";
+    el.agentNote.className = "note";
+    if (!s) el.agentNote.textContent = "no server. the scribe copies its prompt for the AI you carry; paste the reply into a line.";
+    else if (!s.command) el.agentNote.textContent = "paste door: the scribe copies its prompt for the AI you carry.";
     else el.agentNote.innerHTML = "runs <b>" + esc(s.command) + "</b> on " + esc(s.host || "the server") + (s.custom ? " (custom command, set on that machine)" : "");
     const p = prefs();
     el.modes.innerHTML = "";
     Object.keys(S.MODES).forEach((m) => {
       const b = document.createElement("button");
-      b.type = "button"; b.textContent = S.MODES[m]; b.title = m;
+      b.type = "button"; b.className = "opt-t"; b.textContent = S.MODES[m]; b.title = m;
       b.setAttribute("aria-pressed", String(p.mode === m));
       b.addEventListener("click", async () => { try { await setPrefs({ scribe: m }); renderSettings(); toast("Scribe will " + S.MODES[m] + "."); } catch (e) { toast(e.message); } });
       el.modes.appendChild(b);
@@ -640,7 +641,7 @@
     el.keeps.innerHTML = "";
     F.KEEPS.forEach((k) => {
       const b = document.createElement("button");
-      b.type = "button"; b.textContent = KEEP_LABELS[k]; b.title = k;
+      b.type = "button"; b.className = "opt-t"; b.textContent = KEEP_LABELS[k]; b.title = k;
       b.setAttribute("aria-pressed", String(p.keep === k));
       b.addEventListener("click", async () => { try { await setPrefs({ keep: k }); renderSettings(); render(); toast("Done lines stay " + (k === "gone" ? "out of the list" : k === "forever" ? "forever" : "for " + KEEP_LABELS[k]) + "."); } catch (e) { toast(e.message); } });
       el.keeps.appendChild(b);
@@ -661,7 +662,7 @@
     line.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); line.blur(); } e.stopPropagation(); });
     line.addEventListener("blur", () => setServer(line.textContent.trim()));
     el.serverV.appendChild(line);
-    el.storeNote.textContent = s ? "One file. The CLI and any agent edit the same one." : "Items live in this browser until a server is set.";
+    el.storeNote.textContent = s ? "one file. the CLI and any agent edit the same one." : "items live in this browser until a server is set.";
   }
   async function setAgent(name) {
     try {
