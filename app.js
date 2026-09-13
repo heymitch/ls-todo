@@ -799,7 +799,7 @@
 
   /* ---------------- Themes: data, not structure ---------------- */
   const THEMES = [
-    { id: "tokyo-night", bg: "#1a1b26", ac: "#7aa2f7" }, { id: "heymitch", bg: "#1c1612", ac: "#e8682a" },
+    { id: "tokyo-night", bg: "#1a1b26", ac: "#7aa2f7" }, { id: "golden-city", bg: "#141a24", ac: "#c7a86b" }, { id: "heymitch", bg: "#1c1612", ac: "#e8682a" },
     { id: "gruvbox", bg: "#282828", ac: "#fe8019" }, { id: "catppuccin", bg: "#1e1e2e", ac: "#cba6f7" },
     { id: "nord", bg: "#2e3440", ac: "#88c0d0" }, { id: "everforest", bg: "#2d353b", ac: "#a7c080" },
     { id: "rose-pine", bg: "#191724", ac: "#ebbcba" }, { id: "latte", bg: "#eff1f5", ac: "#8839ef" }

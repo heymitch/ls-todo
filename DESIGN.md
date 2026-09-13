@@ -135,6 +135,25 @@ Then register its name in the `THEMES` array so `T` and the swatch bar pick it u
 - [ ] Accent reads as a link color on this ground.
 - [ ] Cycle through with `T`: nothing moves, only colors change.
 
+## Golden City profile
+
+`golden-city` is the Solar Classical / Hyperborean Futurism theme. It should
+read first as blue-slate classical futurism and second as solar bronze. Its
+identity must remain intact if the bronze accent is removed.
+
+The visual ratio is 60% cool atmospheric neutral, 20% pale architectural
+tone, 10% solar warmth, and 10% semantic color. Blue-black surfaces, pale stone
+text, steel blue, muted viridian, restrained terracotta, and foggy blue-gray
+carry as much identity as the bronze accent.
+
+The native Omarchy palette and shell rules are a separate theme package. The
+web contract compresses that richer palette into the 12 role tokens above.
+Selection stays slate blue. Bronze marks active or interactive states, but does
+not become a universal border, fill, icon color, or syntax color.
+
+Anti-goals: black-and-gold luxury, casino styling, glossy black lacquer,
+cyberpunk neon, Matrix green, bright ESG lime, and beige minimalism.
+
 ## Cross-checked against omarchy.org
 
 The OS and its website agree, and this system matches both (verified against
@@ -154,7 +173,8 @@ the `basecamp/omarchy` repo and omarchy.org's shipped CSS):
 
 ## Shipped themes
 
-`tokyo-night` (default), `heymitch` (a cassette-futurism palette),
-`gruvbox`, `catppuccin`, `nord`, `everforest`, `rose-pine`, `latte` (light).
-All but the first are palettes Omarchy actually ships, so they're already
+`tokyo-night` (default), `golden-city` (the Solar Classical theme above),
+`heymitch` (a cassette-futurism palette), `gruvbox`, `catppuccin`, `nord`,
+`everforest`, `rose-pine`, `latte` (light).
+The remaining themes are palettes Omarchy actually ships, so they're already
 proven for contrast and mood.
