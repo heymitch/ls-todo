@@ -32,7 +32,7 @@ function prefsFrom(cfg) {
 }
 
 /* ---------------- args ---------------- */
-const BOOL = new Set(["yes", "dry", "all", "help", "h", "someday"]);
+const BOOL = new Set(["yes", "dry", "all", "help", "h", "someday", "force", "json", "no-link", "no-service", "no-tailscale"]);
 function parseArgs(argv) {
   const flags = {}, rest = [];
   for (let i = 0; i < argv.length; i++) {
@@ -71,6 +71,16 @@ function runAgentAsync(cmd, prompt) {
     p.on("error", (e) => { clearTimeout(timer); reject(e); });
     p.on("close", (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error("agent exited " + code + ": " + err.slice(-600))); });
     p.stdin.end(prompt);
+  });
+}
+
+function httpJson(url, timeoutMs) {
+  return new Promise((resolve) => {
+    const req = http.get(url, { timeout: timeoutMs || 2000 }, (res) => {
+      let b = ""; res.on("data", (d) => { b += d; }); res.on("end", () => { try { resolve(JSON.parse(b)); } catch (e) { resolve(null); } });
+    });
+    req.on("error", () => resolve(null));
+    req.on("timeout", () => { req.destroy(); resolve(null); });
   });
 }
 
@@ -239,6 +249,134 @@ const commands = {
   connect(flags) {
     const server = flags.server || readConfig().url || "http://127.0.0.1:8791";
     process.stdout.write(S.connectPrompt({ server, file: FILE, host: os.hostname() }) + "\n");
+  },
+
+  /* todo install: put `todo` on the PATH, run the server as a login service, publish it on the tailnet, print the phone steps.
+     Non-interactive, so an agent can run it from one pasted command. Safe to run twice. */
+  async install(flags) {
+    const port = parseInt(flags.port || "8791", 10);
+    const httpsPort = parseInt(flags["https-port"] || String(port - 1), 10);
+    const major = parseInt(process.versions.node.split(".")[0], 10);
+    const lines = [];
+    const say = (s) => { lines.push(s); console.log(s); };
+    if (major < 20) return fail("Node 20 or newer is required. This is " + process.versions.node + ".");
+
+    const cfg = readConfig();
+    if (flags.via) { if (!(flags.via in S.PRESETS) && flags.via !== "paste") return fail("--via must be one of " + Object.keys(S.PRESETS).concat("paste").join(", ")); cfg.via = flags.via; }
+    if (flags.github) cfg.github = flags.github;
+    writeConfig(cfg);
+    say("config      " + CONFIG + "  via=" + (cfg.via || "claude") + (cfg.github ? " github=" + cfg.github : ""));
+
+    /* 1. `todo` on the PATH: npm link, else a shim in ~/.local/bin */
+    let linked = false;
+    if (!flags["no-link"]) {
+      const r = spawnSync("npm", ["link", "--silent"], { cwd: APP_DIR, encoding: "utf8", timeout: 60000 });
+      linked = r.status === 0 && spawnSync("sh", ["-c", "command -v todo"], { encoding: "utf8" }).status === 0;
+      if (!linked) {
+        const bin = path.join(os.homedir(), ".local", "bin");
+        fs.mkdirSync(bin, { recursive: true });
+        const shim = path.join(bin, "todo");
+        fs.writeFileSync(shim, "#!/bin/sh\nexec \"" + process.execPath + "\" \"" + path.join(APP_DIR, "cli", "todo") + "\" \"$@\"\n");
+        fs.chmodSync(shim, 0o755);
+        say("command     " + shim + (process.env.PATH.split(":").indexOf(bin) < 0 ? "  (add " + bin + " to your PATH)" : ""));
+      } else say("command     todo (npm link)");
+    }
+
+    /* 2. the login service, unless a todo server already answers on the port */
+    const alive = await httpJson("http://127.0.0.1:" + port + "/api/status", 1500);
+    if (alive && alive.ok && !flags.force) {
+      say("server      already running on port " + port + " (file " + alive.file + "); not touching the service. Use --force to replace it.");
+    } else if (flags["no-service"]) {
+      say("server      skipped (--no-service). Start it with: todo serve --port " + port);
+    } else if (process.platform === "darwin") {
+      const label = "todo-serve";
+      const plist = path.join(os.homedir(), "Library", "LaunchAgents", label + ".plist");
+      const log = path.join(os.homedir(), "Library", "Logs", "todo-serve.log");
+      const env = { PATH: process.env.PATH, HOME: os.homedir() };
+      if (process.env.TODO_FILE) env.TODO_FILE = process.env.TODO_FILE;
+      if (process.env.TODO_CONFIG) env.TODO_CONFIG = process.env.TODO_CONFIG;
+      const xml = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      fs.mkdirSync(path.dirname(plist), { recursive: true });
+      fs.writeFileSync(plist, [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+        '<plist version="1.0"><dict>',
+        "  <key>Label</key><string>" + label + "</string>",
+        "  <key>ProgramArguments</key><array>",
+        "    <string>" + xml(process.execPath) + "</string><string>" + xml(path.join(APP_DIR, "cli", "todo")) + "</string><string>serve</string><string>--port</string><string>" + port + "</string>",
+        "  </array>",
+        "  <key>WorkingDirectory</key><string>" + xml(APP_DIR) + "</string>",
+        "  <key>EnvironmentVariables</key><dict>" + Object.keys(env).map((k) => "<key>" + k + "</key><string>" + xml(env[k]) + "</string>").join("") + "</dict>",
+        "  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>",
+        "  <key>StandardOutPath</key><string>" + xml(log) + "</string><key>StandardErrorPath</key><string>" + xml(log) + "</string>",
+        "</dict></plist>", ""
+      ].join("\n"));
+      const uid = process.getuid();
+      spawnSync("launchctl", ["bootout", "gui/" + uid + "/" + label], { encoding: "utf8" });
+      const b = spawnSync("launchctl", ["bootstrap", "gui/" + uid, plist], { encoding: "utf8" });
+      if (b.status !== 0) return fail("launchctl bootstrap failed: " + (b.stderr || b.stdout));
+      say("service     " + plist + "  (starts at login, restarts if it dies; log " + log + ")");
+    } else if (process.platform === "linux") {
+      const dir = path.join(os.homedir(), ".config", "systemd", "user");
+      const unit = path.join(dir, "todo-serve.service");
+      fs.mkdirSync(dir, { recursive: true });
+      const envLines = ["Environment=PATH=" + process.env.PATH].concat(["TODO_FILE", "TODO_CONFIG"].filter((k) => process.env[k]).map((k) => "Environment=" + k + "=" + process.env[k]));
+      fs.writeFileSync(unit, ["[Unit]", "Description=todo serve", "", "[Service]", "ExecStart=" + process.execPath + " " + path.join(APP_DIR, "cli", "todo") + " serve --port " + port, "WorkingDirectory=" + APP_DIR].concat(envLines, ["Restart=always", "RestartSec=2", "", "[Install]", "WantedBy=default.target", ""]).join("\n"));
+      spawnSync("systemctl", ["--user", "daemon-reload"], { encoding: "utf8" });
+      const e = spawnSync("systemctl", ["--user", "enable", "--now", "todo-serve"], { encoding: "utf8" });
+      if (e.status !== 0) return fail("systemctl enable failed: " + (e.stderr || e.stdout));
+      spawnSync("loginctl", ["enable-linger", os.userInfo().username], { encoding: "utf8" });
+      say("service     " + unit + "  (starts at login, restarts if it dies; logs: journalctl --user -u todo-serve)");
+    } else {
+      say("service     no installer for " + process.platform + ". Run: todo serve --port " + port);
+    }
+
+    /* 3. wait for it */
+    let status = null;
+    for (let i = 0; i < 20 && !status; i++) { status = await httpJson("http://127.0.0.1:" + port + "/api/status", 1000); if (!status) await new Promise((r) => setTimeout(r, 500)); }
+    if (!status || !status.ok) return fail("The server did not answer on port " + port + ". Check the log above.");
+    say("local       http://127.0.0.1:" + port + "/   file " + status.file + "   scribe via " + status.via);
+
+    /* 4. the tailnet, for the phone and for agents on other machines */
+    let phoneUrl = "";
+    const ts = ["tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"].find((c) => spawnSync("sh", ["-c", "command -v " + c], { encoding: "utf8" }).status === 0);
+    if (flags["no-tailscale"]) say("tailnet     skipped (--no-tailscale)");
+    else if (!ts) say("tailnet     Tailscale is not installed. Install it on this machine and on the phone, then run: todo install again, or: tailscale serve --bg --https=" + httpsPort + " http://127.0.0.1:" + port);
+    else {
+      const st = spawnSync(ts, ["status", "--self", "--json"], { encoding: "utf8" });
+      let dns = "";
+      try { dns = JSON.parse(st.stdout).Self.DNSName.replace(/\.$/, ""); } catch (e) {}
+      if (!dns) say("tailnet     Tailscale is installed but not signed in. Sign in, then run todo install again.");
+      else {
+        const sv = spawnSync(ts, ["serve", "--bg", "--https=" + httpsPort, "http://127.0.0.1:" + port], { encoding: "utf8" });
+        if (sv.status !== 0) say("tailnet     tailscale serve failed: " + (sv.stderr || sv.stdout).trim() + "\n            (HTTPS certificates may be off for your tailnet: enable them at login.tailscale.com/admin/dns, then rerun)");
+        else { phoneUrl = "https://" + dns + ":" + httpsPort + "/"; say("tailnet     " + phoneUrl + "  (tailnet only; remove with: tailscale serve --https=" + httpsPort + " off)"); }
+      }
+    }
+
+    say("");
+    say("On the phone: install Tailscale from the App Store and sign in to the same account. Open " + (phoneUrl || "the tailnet URL above") + " in Safari,");
+    say("tap Share, then Add to Home Screen. Open it, tap settings, and pick the agent you see listed as running. Type a line, press return, tap scribe.");
+    if (flags.json) console.log(JSON.stringify({ local: "http://127.0.0.1:" + port + "/", phone: phoneUrl, file: status.file, via: status.via, linked }));
+  },
+
+  async uninstall(flags) {
+    const port = parseInt(flags.port || "8791", 10);
+    const httpsPort = parseInt(flags["https-port"] || String(port - 1), 10);
+    if (process.platform === "darwin") {
+      const plist = path.join(os.homedir(), "Library", "LaunchAgents", "todo-serve.plist");
+      spawnSync("launchctl", ["bootout", "gui/" + process.getuid() + "/todo-serve"], { encoding: "utf8" });
+      if (fs.existsSync(plist)) { fs.unlinkSync(plist); console.log("removed " + plist); }
+    } else if (process.platform === "linux") {
+      spawnSync("systemctl", ["--user", "disable", "--now", "todo-serve"], { encoding: "utf8" });
+      const unit = path.join(os.homedir(), ".config", "systemd", "user", "todo-serve.service");
+      if (fs.existsSync(unit)) { fs.unlinkSync(unit); console.log("removed " + unit); }
+    }
+    const ts = ["tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"].find((c) => spawnSync("sh", ["-c", "command -v " + c], { encoding: "utf8" }).status === 0);
+    if (ts) spawnSync(ts, ["serve", "--https=" + httpsPort, "off"], { encoding: "utf8" });
+    const shim = path.join(os.homedir(), ".local", "bin", "todo");
+    try { if (fs.readFileSync(shim, "utf8").includes(path.join(APP_DIR, "cli", "todo"))) { fs.unlinkSync(shim); console.log("removed " + shim); } } catch (e) {}
+    console.log("The service is gone. Your file and config are untouched: " + FILE + ", " + CONFIG);
   },
 
   config(flags, rest) {
@@ -434,6 +572,9 @@ const commands = {
       "  todo capture [file]       rewrite outside text with your agent and add the result",
       "  todo prompt [file]        print the scribe prompt (default: your raw lines)",
       "  todo import [file]        merge items already in the todo format",
+      "  todo install [--via claude] [--github login] [--port 8791] [--no-tailscale]",
+      "                            put todo on the PATH, run the server at login, publish it on the tailnet, print phone steps",
+      "  todo uninstall            remove the service and the tailnet route; keep the file",
       "  todo serve [--port 8791] [--host 127.0.0.1] [--via claude] [--github login]",
       "  todo config [via <preset|'command'> | scribe <unbundle|one|merge> | extra <instruction>",
       "               | keep <gone|1h|today|week|forever> | github <login> | url <server URL>]",

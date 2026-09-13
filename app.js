@@ -4,7 +4,7 @@
   "use strict";
   const F = window.TodoFormat, S = window.TodoScribe;
   const el = {};
-  ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "scribe",
+  ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "scribe", "startBtn",
    "settingsWrap", "settingsWin", "storeNote", "exportBtn", "copyBtn", "importFile", "importBtn", "promptBtn", "rawEditor", "clearBtn",
    "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote", "modes", "extraLine", "keeps", "settingsClose",
    "settingsBtn", "toast", "toastMsg", "undoBtn", "themeName", "swatches",
@@ -44,7 +44,9 @@
     async load() {
       const r = await fetch(this.url("api/file"), { cache: "no-store" });
       this.etag = r.headers.get("ETag");
-      return r.ok ? await r.text() : "";
+      const text = r.ok ? await r.text() : "";
+      if (r.ok) OfflineStore.remember(text, this.status);
+      return text;
     },
     async save(t) {
       const r = await fetch(this.url("api/file"), { method: "PUT", headers: { "Content-Type": "text/plain; charset=utf-8", "If-Match": this.etag || "*" }, body: t });
@@ -61,6 +63,25 @@
     async scribe(raw) { return this.post("api/scribe", { raw }); },
     async config(patch) { this.status = await this.post("api/config", patch, "PUT"); return this.status; },
     async testAgent() { return this.post("api/agent-test", {}); }
+  };
+
+  /* When the server cannot be reached, the last copy it sent stays usable. Lines added offline merge back when it answers. */
+  const OfflineStore = {
+    kind: "offline",
+    remember(text, status) {
+      try {
+        localStorage.setItem("todo.cache", text);
+        localStorage.setItem("todo.cache.at", F.now());
+        if (status && status.host) localStorage.setItem("todo.host", status.host);
+      } catch (e) {}
+    },
+    get has() { try { return localStorage.getItem("todo.cache") !== null; } catch (e) { return false; } },
+    get at() { try { return localStorage.getItem("todo.cache.at") || ""; } catch (e) { return ""; } },
+    get host() { try { return localStorage.getItem("todo.host") || "the server"; } catch (e) { return "the server"; } },
+    get dirty() { try { return localStorage.getItem("todo.cache.dirty") === "1"; } catch (e) { return false; } },
+    async load() { try { return localStorage.getItem("todo.cache") || ""; } catch (e) { return ""; } },
+    async save(t) { try { localStorage.setItem("todo.cache", t); localStorage.setItem("todo.cache.dirty", "1"); } catch (e) {} return true; },
+    clearDirty() { try { localStorage.removeItem("todo.cache.dirty"); } catch (e) {} }
   };
 
   let store = LocalStore;
@@ -578,9 +599,38 @@
   el.settingsWrap.addEventListener("click", (e) => { if (e.target === el.settingsWrap) closeSettings(); });
   el.settingsClose.addEventListener("click", closeSettings);
   function statusWord() {
+    if (store === OfflineStore) return "offline" + (OfflineStore.at ? " · synced " + OfflineStore.at.slice(11) : "");
     if (store !== RemoteStore) return "paste door";
     return RemoteStore.hasAgent ? RemoteStore.via : "paste door";
   }
+  /* Lines added while offline are merged into the server copy. Nothing is deleted by a merge. */
+  /* Read the offline copy before the server's copy replaces it in the cache. */
+  async function offlinePending() { return OfflineStore.dirty ? await OfflineStore.load() : null; }
+  async function syncOffline(offlineText) {
+    if (offlineText === null) return 0;
+    const added = F.merge(sections, F.parse(offlineText));
+    sections.forEach((s) => s.items.forEach((it) => { if (!it.id) it.id = uid(); }));
+    if (added) await saveNow();
+    OfflineStore.clearDirty();
+    return added;
+  }
+  async function goOnline() {
+    if (!(await RemoteStore.probe())) return false;
+    const pending = await offlinePending();
+    store = RemoteStore;
+    load(await RemoteStore.load()); lastSaved = currentText();
+    const added = await syncOffline(pending);
+    render(); setStatus(statusWord(), "ok"); el.startBtn.hidden = true;
+    loadGithub();
+    if (added) toast("Back online. " + added + " line" + (added === 1 ? "" : "s") + " added while offline went up.", true);
+    return true;
+  }
+  el.startBtn.addEventListener("click", async () => {
+    el.startBtn.disabled = true; el.startBtn.textContent = "starting…";
+    const ok = await goOnline();
+    el.startBtn.disabled = false; el.startBtn.textContent = "start";
+    if (!ok) toast("No answer from " + OfflineStore.host + " yet. Wake it up, or run todo serve on it, then tap start again.");
+  });
   function renderSettings() {
     const s = RemoteStore.status;
     el.presets.innerHTML = "";
@@ -786,9 +836,13 @@
   /* ---------------- Boot ---------------- */
   (async function boot() {
     if (await RemoteStore.probe()) store = RemoteStore;
-    setStatus(statusWord(), store === RemoteStore ? "ok" : "");
+    else if (OfflineStore.has) store = OfflineStore;
+    setStatus(statusWord(), store === RemoteStore ? "ok" : store === OfflineStore ? "err" : "");
+    el.startBtn.hidden = store !== OfflineStore;
+    const pending = store === RemoteStore ? await offlinePending() : null;
     const initial = await store.load();
     load(initial); lastSaved = initial;
+    if (store === RemoteStore) { const added = await syncOffline(pending); if (added) toast(added + " line" + (added === 1 ? "" : "s") + " added while offline went up.", true); }
     render();
     loadGithub();
     if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {

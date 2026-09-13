@@ -16,30 +16,44 @@ The agent's job is called the scribe. You log lines in your own words. When you 
 - **Type first, clean later.** Return logs the line as written. Scribe is a button for whenever you want the logged lines cleaned. Undo is the safety net.
 - **The file is the truth.** Export is the file. Import is the file. Agents edit the file.
 
-## Quickstart
+## Install with your agent
 
-Node 20 or newer. Nothing else is required.
+Paste this into the agent you already use, on the computer that will hold the list. Claude Code, Codex, Hermes, and Grok all work. It takes about a minute.
 
 ```
-git clone https://github.com/heymitch/todo && cd todo
-node cli/todo serve
+Install todo for me from https://github.com/heymitch/todo
+
+1. Check `node --version` is 20 or newer. If not, install Node first and tell me.
+2. Clone the repo to ~/todo, or `git pull` if it is already there.
+3. Run: node ~/todo/cli/todo install --via <your own name: claude, codex, hermes, or grok>
+   It puts the `todo` command on my PATH, registers the server to start at login,
+   publishes it on my Tailscale network if Tailscale is installed, and prints the URLs.
+4. Show me the tailnet URL it printed and the phone steps. If it said Tailscale is
+   missing, tell me to install Tailscale on this computer and on my phone, then rerun step 3.
+5. Run `todo` and show me the list to prove it works.
 ```
 
-Open http://127.0.0.1:8791. Type a line and press Return. That is the whole product without an agent.
+That is the whole install. If you would rather do it by hand: Node 20 or newer, `git clone https://github.com/heymitch/todo`, `node todo/cli/todo install`. Or skip the service entirely with `node cli/todo serve` and open http://127.0.0.1:8791.
 
-To add the scribe, open settings and pick the agent that is installed on this machine: `claude` for Claude Code, `codex`, `hermes`, or `grok`. Press **test** to see it answer. If none of those is installed, pick `paste`: the scribe button copies its prompt, you paste it into any AI, and you paste the reply back into a line.
-
-`npm link` puts the `todo` command on your PATH.
+Then open settings in the app and pick the agent that is installed on this machine: `claude` for Claude Code, `codex`, `hermes`, or `grok`. Press **test** to see it answer. If none of those is installed, pick `paste`: the scribe button copies its prompt, you paste it into any AI, and you paste the reply back into a line.
 
 ## On your phone
 
-The server has no login, so it should never face the internet. The clean way to reach it from a phone is a private network. [Tailscale](https://tailscale.com) is free for personal use and gives every device you own a private address and a trusted HTTPS name.
+The server has no login, so it should never face the internet. The clean way to reach it from a phone is a private network. [Tailscale](https://tailscale.com) is free for personal use and gives every device you own a private address and a trusted HTTPS name. The installer publishes the server there for you; by hand it is one command:
 
 ```
 tailscale serve --bg --https=8790 http://127.0.0.1:8791
 ```
 
-With Tailscale on the phone, open `https://<machine>.<tailnet>.ts.net:8790/` and use Add to Home Screen. HTTPS matters here: it is what lets the page install as an app. To keep the server running after you log out or reboot, see `install/` for a launchd plist and a systemd unit.
+With Tailscale on the phone, open `https://<machine>.<tailnet>.ts.net:8790/` and use Add to Home Screen. HTTPS matters here: it is what lets the page install as an app.
+
+## Does the computer have to stay on?
+
+The list lives on the computer that runs the server, so the phone can sync and scribe only while that computer is awake. The installer registers the server as a login service: it comes back after a reboot and restarts if it dies. Close the laptop and the server sleeps with it.
+
+When the phone cannot reach the server it keeps the last copy it saw, marked **offline** with the time of the last sync. You can still check boxes and add lines. A **start** button next to scribe tries the server again; when it answers, lines you added offline go up and nothing is deleted. Scribe falls back to the paste door while offline.
+
+If you want it always on, run the server on a machine that stays up, a Mac mini or a small VPS on the same tailnet, and point the phone there. `todo uninstall` removes the service and the tailnet route and leaves your file alone.
 
 ## Bring your agent
 
@@ -115,6 +129,8 @@ todo config extra "headlines under six words"
 todo config keep week                 gone | 1h | today | week | forever
 todo config github <login>
 todo config url https://...           the server's private URL, used by todo connect
+todo install [--via claude] [--github <login>] [--no-tailscale]
+todo uninstall
 todo serve [--port 8791] [--host 127.0.0.1]
 todo raw | todo path
 ```
