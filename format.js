@@ -154,6 +154,33 @@
     return asks.filter(function (a) { return a.raw && a.options.length; });
   }
 
+  /* A scribe reply. Indented items under a line are its decomposition: the parent is dropped and each child
+     carries `from`, the parent's words. Returns {sections, asks}. Files are parsed with parse(); replies with this. */
+  function parseReply(text) {
+    var sections = [], cur = null, inAsk = false, parent = null;
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var hd = line.match(HEADING_RE);
+      if (hd) { var name = sectionOf(hd[1]); inAsk = name === ASK; cur = inAsk ? null : findOrAdd(sections, name); parent = null; continue; }
+      if (inAsk) continue;
+      var m = line.replace(/^\s+/, "").match(ITEM_RE);
+      if (!m || m[1] === "?") continue;
+      if (!cur) cur = findOrAdd(sections, TODO);
+      var it = parseItem(m[1] !== " ", m[2]);
+      if (!it.head) continue;
+      if (/^\s{2,}/.test(line) && parent) {
+        if (!parent.dropped) { var at = parent.sec.items.indexOf(parent.it); if (at > -1) parent.sec.items.splice(at, 1); parent.dropped = true; }
+        it.from = parent.it.head;
+        cur.items.push(it);
+      } else {
+        parent = { it: it, sec: cur, dropped: false };
+        cur.items.push(it);
+      }
+    }
+    return { sections: sections, asks: parseAsks(text) };
+  }
+
   /* Replace the raw open lines with a scribed reply, except lines the scribe asked about. Returns items added. */
   function absorb(sections, replySections, keepRaw) {
     var keep = {};
@@ -217,9 +244,10 @@
   function numbers(text) {
     return (String(text || "").match(/\d[\d.,:/-]*/g) || []).map(function (n) { return n.replace(/[.,:/-]+$/, ""); });
   }
-  /* guard(rawCapture, proposedText) -> {days, items:[{day, item, flags[]}], flagged} */
-  function guard(raw, proposedText) {
-    var sections = parse(proposedText);
+  /* guard(rawCapture, proposedTextOrSections) -> {days, items:[{day, item, flags[]}], flagged}
+     A decomposed child (item.from) is expected to add ordinary words for its step, so only new numbers flag there. */
+  function guard(raw, proposed) {
+    var sections = Array.isArray(proposed) ? proposed : parse(proposed);
     var rawStems = {}, rawNums = {};
     words(raw).forEach(function (w) { rawStems[stem(w)] = true; });
     numbers(raw).forEach(function (n) { rawNums[n] = true; });
@@ -229,7 +257,7 @@
         var text = [it.head, it.detail, it.source].join(" ");
         var flags = [], seen = {};
         numbers(text).forEach(function (n) { if (!rawNums[n] && !seen["#" + n]) { seen["#" + n] = true; flags.push("new number " + n); } });
-        words(text).forEach(function (w) {
+        if (!it.from) words(text).forEach(function (w) {
           if (w.length < 5 || STOP.test(w) || seen[w]) return;
           seen[w] = true;
           if (!rawStems[stem(w)]) flags.push("new word " + w);
@@ -243,7 +271,7 @@
 
   return {
     TODO: TODO, SOMEDAY: SOMEDAY, ASK: ASK,
-    parse: parse, parseAsks: parseAsks, serialize: serialize, serializeItem: serializeItem, sortSections: sortSections,
+    parse: parse, parseAsks: parseAsks, parseReply: parseReply, serialize: serialize, serializeItem: serializeItem, sortSections: sortSections,
     merge: merge, absorb: absorb, rawItems: rawItems, rawText: rawText, countOpen: countOpen, normLine: normLine,
     today: today, isoDate: isoDate, doneByDay: doneByDay,
     rawLine: rawLine, structuredLine: structuredLine, plainItem: plainItem, isFormatted: isFormatted,

@@ -101,8 +101,11 @@ function confirm(question) {
   });
 }
 function printProposal(g, asks) {
+  let lastFrom = null;
   g.items.forEach((e, i) => {
-    console.log(String(i + 1).padStart(3, " ") + " " + (e.day === F.SOMEDAY ? "someday " : "") + F.serializeItem(e.item));
+    if (e.item.from && e.item.from !== lastFrom) console.log("    " + e.item.from + " ->");
+    lastFrom = e.item.from || null;
+    console.log(String(i + 1).padStart(3, " ") + " " + (e.item.from ? "  " : "") + (e.day === F.SOMEDAY ? "someday " : "") + F.serializeItem(e.item));
     if (e.flags.length) console.log("      ! " + e.flags.join(" · "));
   });
   asks.forEach((a) => {
@@ -142,8 +145,9 @@ async function scribeText(raw, flags, onCommit) {
   process.stderr.write("scribe via: " + cmd + "\n");
   const reply = runAgentSync(cmd, S.buildPrompt(raw));
   const cleaned = S.clean(reply);
-  const g = F.guard(raw, cleaned);
-  const asks = F.parseAsks(cleaned);
+  const parsed = F.parseReply(cleaned);
+  const g = F.guard(raw, parsed.sections);
+  const asks = parsed.asks;
   if (!g.items.length && !asks.length) { console.error("No items in the reply. Raw reply:\n" + reply); process.exitCode = 1; return; }
   printProposal(g, asks);
   if (flags.dry) return;
@@ -223,6 +227,11 @@ const commands = {
   raw() { process.stdout.write(readFile()); },
   path() { console.log(FILE); },
 
+  connect(flags) {
+    const server = flags.server || readConfig().url || "http://127.0.0.1:8791";
+    process.stdout.write(S.connectPrompt({ server, file: FILE, host: os.hostname() }) + "\n");
+  },
+
   config(flags, rest) {
     const cfg = readConfig();
     if (!rest.length) {
@@ -232,7 +241,7 @@ const commands = {
       return;
     }
     const key = rest[0], value = rest.slice(1).join(" ");
-    if (key !== "via" && key !== "github") return usage("todo config [via <claude|codex|hermes|grok|paste|'command'> | github <login>]");
+    if (key !== "via" && key !== "github" && key !== "url") return usage("todo config [via <claude|codex|hermes|grok|paste|'command'> | github <login> | url <public server URL>]");
     if (!value) { delete cfg[key]; } else cfg[key] = value;
     writeConfig(cfg);
     console.log(key + " = " + (value || "(unset)") + (key === "via" ? "  ->  " + (commandFor(value || "claude") || "(paste door)") : ""));
@@ -400,7 +409,8 @@ const commands = {
       "  todo prompt [file]        print the scribe prompt (default: your raw lines)",
       "  todo import [file]        merge items already in the todo format",
       "  todo serve [--port 8791] [--host 127.0.0.1] [--via claude] [--github login]",
-      "  todo config [via <preset|'command'> | github <login>]",
+      "  todo config [via <preset|'command'> | github <login> | url <server URL>]",
+      "  todo connect [--server URL]   print the setup prompt that connects any agent to this list",
       "  todo raw | todo path",
       "",
       "File: $TODO_FILE or ~/todo.md. Config: ~/.todo.json next to it. Agent commands read the",

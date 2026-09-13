@@ -67,6 +67,29 @@ test("absorb replaces raw open lines with the scribed reply and keeps everything
   assert.ok(s[0].items.some((it) => it.head === "SAM CALLED ABOUT THE VIDEO."));
 });
 
+test("parseReply drops a decomposed parent and tags its children; guard relaxes to numbers on children", () => {
+  const reply = [
+    "## Todo", "",
+    "* [ ] **MILK IN THE FRIDGE.**",
+    "* [ ] launch the course by oct 1",
+    "  * [ ] **COURSE OUTLINE WRITTEN.**",
+    "  * [ ] **FIRST THREE LESSONS RECORDED.**",
+    "  * [ ] **LAUNCH EMAIL SENT BY OCT 1.**",
+    "* [ ] **CAR WASHED.**", ""
+  ].join("\n");
+  const { sections, asks } = F.parseReply(reply);
+  assert.equal(asks.length, 0);
+  const heads = sections[0].items.map((it) => it.head);
+  assert.deepEqual(heads, ["MILK IN THE FRIDGE.", "COURSE OUTLINE WRITTEN.", "FIRST THREE LESSONS RECORDED.", "LAUNCH EMAIL SENT BY OCT 1.", "CAR WASHED."]);
+  assert.equal(sections[0].items[1].from, "launch the course by oct 1");
+  assert.equal(sections[0].items[4].from, undefined);
+  const g = F.guard("milk in the fridge\nlaunch the course by oct 1\nwash the car", sections);
+  assert.equal(g.flagged, 0, "ordinary step words on children do not flag");
+  const g2 = F.guard("launch the course", F.parseReply("## Todo\n\n* [ ] launch the course\n  * [ ] **12 LESSONS RECORDED.**\n").sections);
+  assert.equal(g2.flagged, 1, "a new number on a child still flags");
+  assert.ok(F.parse(reply)[0].items.length === 6, "parse() of a file keeps every line flat and intact");
+});
+
 test("an Ask section yields questions with complete options and never leaks into Todo", () => {
   const reply = [
     "## Todo", "", "* [ ] **RUST LEARNED.**", "",

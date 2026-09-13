@@ -6,7 +6,7 @@
   const el = {};
   ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "mic", "scribe",
    "settingsWin", "storeNote", "exportBtn", "copyBtn", "importFile", "importBtn", "promptBtn", "rawEditor", "clearBtn",
-   "presets", "agentNote", "githubLine", "serverV",
+   "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote",
    "settingsBtn", "toast", "toastMsg", "undoBtn", "themeName", "swatches",
    "askWrap", "ask", "askCount", "askRaw", "askOptions", "askOther", "askOtherLine", "askHint",
    "heatWin", "heatFact", "heatMonths", "heatGrid"].forEach((id) => { el[id] = document.getElementById(id); });
@@ -259,6 +259,7 @@
     const b = document.createElement("b"); appendMarked(b, it.head, fl); line.appendChild(b);
     if (it.detail) { line.appendChild(document.createTextNode(" ")); const d = document.createElement("span"); d.className = "d"; appendMarked(d, it.detail, fl); line.appendChild(d); }
     if (it.source) { line.appendChild(document.createTextNode(" ")); const s = document.createElement("span"); s.className = "s"; s.textContent = "Source: " + it.source; line.appendChild(s); }
+    if (it.from) { line.appendChild(document.createTextNode(" ")); const f = document.createElement("span"); f.className = "s"; f.textContent = "↳ " + it.from; line.appendChild(f); }
   }
   function appendMarked(parent, text, fl) {
     const words = fl.map((f) => (f.match(/^new (?:word|number) (.+)$/) || [])[1]).filter(Boolean);
@@ -424,16 +425,19 @@
     } finally { el.scribe.disabled = false; }
   });
   function applyScribe(raw, cleaned) {
-    const g = F.guard(raw, cleaned);
-    const askList = F.parseAsks(cleaned);
+    const reply = F.parseReply(cleaned);
+    const g = F.guard(raw, reply.sections);
+    const askList = reply.asks;
     if (!g.items.length && !askList.length) { toast("The scribe returned nothing in the format."); return; }
     prevText = currentText();
-    g.days.forEach((s) => s.items.forEach((it) => { it.id = uid(); }));
-    F.absorb(sections, g.days, askList.map((a) => a.raw));
+    reply.sections.forEach((s) => s.items.forEach((it) => { it.id = uid(); }));
+    F.absorb(sections, reply.sections, askList.map((a) => a.raw));
     g.items.forEach((e) => { if (e.flags.length) flags[e.item.id] = e.flags; });
     saveNow();
     render();
+    const parents = new Set(g.items.map((e) => e.item.from).filter(Boolean));
     const parts = [g.items.length + " scribed"];
+    if (parents.size) parts.push(parents.size + " broken down");
     if (g.flagged) parts.push(g.flagged + " flagged");
     if (askList.length) parts.push(askList.length + " question" + (askList.length > 1 ? "s" : ""));
     toast(parts.join(", ") + ".", true);
@@ -511,7 +515,7 @@
       const j = await RemoteStore.scribe((f.s.day === SOMEDAY ? "someday: " : "") + a.raw + " [answer: " + text + "]");
       const cleaned = S.clean(j.cleaned || j.reply || "");
       const items = [];
-      F.parse(cleaned).forEach((s) => s.items.forEach((it) => items.push({ it, sec: s.day })));
+      F.parseReply(cleaned).sections.forEach((s) => s.items.forEach((it) => items.push({ it, sec: s.day })));
       if (items.length) {
         prevText = currentText();
         removeItem(a.id);
@@ -644,6 +648,13 @@
     } catch (e) { el.agentNote.className = "note status-err"; el.agentNote.textContent = e.message; }
     if (btn) { btn.disabled = false; btn.textContent = "test"; }
   }
+  el.connectBtn.addEventListener("click", async () => {
+    const s = RemoteStore.status;
+    const server = RemoteStore.base || (store === RemoteStore ? location.origin : "");
+    if (!s || !server) { toast("Connect needs a server. Run todo serve and open the page from it."); return; }
+    const ok = await copyText(S.connectPrompt({ server, file: s.file, host: s.host }));
+    toast(ok ? "Setup copied. Paste it into your agent." : "Could not copy.");
+  });
   el.githubLine.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.githubLine.blur(); } e.stopPropagation(); });
   el.githubLine.addEventListener("blur", async () => {
     if (!RemoteStore.status) return;
