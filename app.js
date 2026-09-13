@@ -6,7 +6,7 @@
   const el = {};
   ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "mic", "scribe",
    "settingsWrap", "settingsWin", "storeNote", "exportBtn", "copyBtn", "importFile", "importBtn", "promptBtn", "rawEditor", "clearBtn",
-   "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote",
+   "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote", "modes", "extraLine", "keeps",
    "settingsBtn", "toast", "toastMsg", "undoBtn", "themeName", "swatches",
    "askWrap", "ask", "askCount", "askRaw", "askOptions", "askOther", "askOtherLine", "askHint",
    "heatWin", "heatFact", "heatMonths", "heatGrid"].forEach((id) => { el[id] = document.getElementById(id); });
@@ -114,8 +114,22 @@
   function scheduleRender() { setTimeout(() => { if (isLineFocused()) dirty = true; else render(); }, 60); }
   function updateCounts() { el.openCount.textContent = F.countOpen(sections) + " open"; el.rawEditor.value = currentText(); }
 
-  /* Done lines stay in the file with their date. The list shows only today's. The heat map shows the rest. */
-  function visible(it) { return !it.done || !it.doneAt || it.doneAt === F.today(); }
+  /* Preferences: how the scribe works and how long done lines linger. Kept on the server when there is one, else in this browser. */
+  const KEEP_LABELS = { gone: "gone", "1h": "an hour", today: "today", week: "a week", forever: "forever" };
+  function prefs() {
+    const s = RemoteStore.status;
+    if (s) return { mode: s.scribe || "unbundle", extra: s.extra || "", keep: s.keep || "today" };
+    let p = {};
+    try { p = JSON.parse(localStorage.getItem("todo.prefs") || "{}"); } catch (e) {}
+    return { mode: S.MODES[p.mode] ? p.mode : "unbundle", extra: p.extra || "", keep: F.KEEPS.indexOf(p.keep) > -1 ? p.keep : "today" };
+  }
+  async function setPrefs(patch) {
+    if (RemoteStore.status) { await RemoteStore.config(patch); }
+    else { const p = Object.assign(prefs(), patch); try { localStorage.setItem("todo.prefs", JSON.stringify(p)); } catch (e) {} }
+  }
+  /* Done lines stay in the file with their stamp. The list keeps them for as long as the done setting says. */
+  function visible(it) { return F.doneVisible(it, prefs().keep, new Date()); }
+  setInterval(() => { if (prefs().keep === "1h" && !isLineFocused() && el.settingsWrap.hidden) render(); }, 60000);
   function render(focus) {
     dirty = false;
     const todo = ensure(TODO), someday = ensure(SOMEDAY);
@@ -369,7 +383,7 @@
     const f = findItem(id); if (!f) return;
     prevText = currentText();
     f.it.done = !f.it.done;
-    f.it.doneAt = f.it.done ? F.today() : "";
+    f.it.doneAt = f.it.done ? F.now() : "";
     saveNow();
     scheduleRender();
     toast(f.it.done ? "Done. Another person can use it, read it, or buy it?" : "Reopened.", true);
@@ -408,7 +422,7 @@
     const raw = F.rawText(sections);
     if (!raw) { toast("Nothing raw to scribe. Type a line first."); focusLine({ add: true }); return; }
     if (store !== RemoteStore || !RemoteStore.hasAgent) {
-      const ok = await copyText(S.buildPrompt(raw));
+      const ok = await copyText(S.buildPrompt(raw, prefs()));
       setStatus(ok ? "prompt copied" : "copy failed", ok ? "ok" : "err");
       toast(ok ? "Prompt copied. Paste it into any AI, then paste the reply into a line." : "Could not copy.");
       return;
@@ -613,6 +627,24 @@
     if (!s) el.agentNote.textContent = "No server. The scribe copies its prompt for the AI you carry; paste the reply into a line.";
     else if (!s.command) el.agentNote.textContent = "Paste door: the scribe copies its prompt for the AI you carry.";
     else el.agentNote.innerHTML = "runs <b>" + esc(s.command) + "</b> on " + esc(s.host || "the server") + (s.custom ? " (custom command, set on that machine)" : "");
+    const p = prefs();
+    el.modes.innerHTML = "";
+    Object.keys(S.MODES).forEach((m) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = S.MODES[m]; b.title = m;
+      b.setAttribute("aria-pressed", String(p.mode === m));
+      b.addEventListener("click", async () => { try { await setPrefs({ scribe: m }); renderSettings(); toast("Scribe will " + S.MODES[m] + "."); } catch (e) { toast(e.message); } });
+      el.modes.appendChild(b);
+    });
+    el.extraLine.textContent = p.extra;
+    el.keeps.innerHTML = "";
+    F.KEEPS.forEach((k) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = KEEP_LABELS[k]; b.title = k;
+      b.setAttribute("aria-pressed", String(p.keep === k));
+      b.addEventListener("click", async () => { try { await setPrefs({ keep: k }); renderSettings(); render(); toast("Done lines stay " + (k === "gone" ? "out of the list" : k === "forever" ? "forever" : "for " + KEEP_LABELS[k]) + "."); } catch (e) { toast(e.message); } });
+      el.keeps.appendChild(b);
+    });
     el.githubLine.textContent = s ? (s.github || "") : "";
     el.githubLine.contentEditable = s ? "plaintext-only" : "false";
     el.serverV.innerHTML = "";
@@ -657,6 +689,13 @@
     const ok = await copyText(S.connectPrompt({ server, file: s.file, host: s.host }));
     toast(ok ? "Setup copied. Paste it into your agent." : "Could not copy.");
   });
+  el.extraLine.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.extraLine.blur(); } e.stopPropagation(); });
+  el.extraLine.addEventListener("blur", async () => {
+    const v = el.extraLine.textContent.replace(/\s+/g, " ").trim().slice(0, S.EXTRA_MAX);
+    if (v === prefs().extra) return;
+    try { await setPrefs({ extra: v }); toast(v ? "The scribe will follow that." : "Extra instruction cleared."); }
+    catch (e) { toast(e.message); el.extraLine.textContent = prefs().extra; }
+  });
   el.githubLine.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); el.githubLine.blur(); } e.stopPropagation(); });
   el.githubLine.addEventListener("blur", async () => {
     if (!RemoteStore.status) return;
@@ -693,7 +732,7 @@
     commitFocused();
     const raw = F.rawText(sections);
     if (!raw) { toast("Nothing raw to scribe."); return; }
-    toast((await copyText(S.buildPrompt(raw))) ? "Prompt copied. Paste the reply into a line." : "Could not copy.");
+    toast((await copyText(S.buildPrompt(raw, prefs()))) ? "Prompt copied. Paste the reply into a line." : "Could not copy.");
   });
   el.exportBtn.addEventListener("click", async () => {
     const text = currentText();

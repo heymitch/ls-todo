@@ -21,6 +21,15 @@ function readConfig() { try { return JSON.parse(fs.readFileSync(CONFIG, "utf8"))
 function writeConfig(cfg) { fs.mkdirSync(path.dirname(CONFIG), { recursive: true }); fs.writeFileSync(CONFIG, JSON.stringify(cfg, null, 2) + "\n"); }
 /* "paste" means no agent on this machine: the app copies the prompt instead. */
 function commandFor(via) { return via === "paste" ? "" : (S.PRESETS[via] || via); }
+/* How the scribe works and how long done lines linger. From the config file, with defaults. */
+function prefsFrom(cfg) {
+  cfg = cfg || readConfig();
+  return {
+    mode: S.MODES[cfg.scribe] ? cfg.scribe : "unbundle",
+    extra: String(cfg.extra || "").slice(0, S.EXTRA_MAX),
+    keep: F.KEEPS.indexOf(cfg.keep) > -1 ? cfg.keep : "today"
+  };
+}
 
 /* ---------------- args ---------------- */
 const BOOL = new Set(["yes", "dry", "all", "help", "h", "someday"]);
@@ -143,7 +152,7 @@ async function askAll(asks, flags) {
 async function scribeText(raw, flags, onCommit) {
   const cmd = agentCommand(flags.via);
   process.stderr.write("scribe via: " + cmd + "\n");
-  const reply = runAgentSync(cmd, S.buildPrompt(raw));
+  const reply = runAgentSync(cmd, S.buildPrompt(raw, prefsFrom()));
   const cleaned = S.clean(reply);
   const parsed = F.parseReply(cleaned);
   const g = F.guard(raw, parsed.sections);
@@ -178,7 +187,7 @@ const commands = {
     const rows = enumerate(sections, false);
     if (!n || !rows[n - 1]) return usage("todo done <number from todo list>");
     rows[n - 1].item.done = true;
-    rows[n - 1].item.doneAt = F.today();
+    rows[n - 1].item.doneAt = F.now();
     writeFile(F.serialize(sections));
     console.log("Done: " + rows[n - 1].item.head);
   },
@@ -212,7 +221,7 @@ const commands = {
   prompt(flags, rest) {
     const raw = rest[0] || !process.stdin.isTTY ? readInput(rest) : F.rawText(F.parse(readFile()));
     if (!raw) return usage("todo prompt [file]   (default: the raw lines in your file)");
-    process.stdout.write(S.buildPrompt(raw) + "\n");
+    process.stdout.write(S.buildPrompt(raw, prefsFrom()) + "\n");
   },
 
   import(flags, rest) {
@@ -234,14 +243,21 @@ const commands = {
 
   config(flags, rest) {
     const cfg = readConfig();
+    const p = prefsFrom(cfg);
     if (!rest.length) {
       console.log("config      " + CONFIG);
       console.log("via         " + (cfg.via || process.env.TODO_AGENT || "claude") + "  ->  " + (commandFor(agentName()) || "(paste door)"));
+      console.log("scribe      " + p.mode + "  (" + S.MODES[p.mode] + ")" + (p.extra ? "\nextra       " + p.extra : ""));
+      console.log("keep        " + p.keep + "  (how long done lines stay in the list)");
       console.log("github      " + (cfg.github || process.env.TODO_GITHUB || "off"));
+      if (cfg.url) console.log("url         " + cfg.url);
       return;
     }
     const key = rest[0], value = rest.slice(1).join(" ");
-    if (key !== "via" && key !== "github" && key !== "url") return usage("todo config [via <claude|codex|hermes|grok|paste|'command'> | github <login> | url <public server URL>]");
+    const KEYS = ["via", "github", "url", "scribe", "extra", "keep"];
+    if (KEYS.indexOf(key) < 0) return usage("todo config [via <preset|'command'> | scribe <unbundle|one|merge> | extra <instruction> | keep <gone|1h|today|week|forever> | github <login> | url <server URL>]");
+    if (key === "scribe" && value && !S.MODES[value]) return fail("scribe must be one of: " + Object.keys(S.MODES).join(", "));
+    if (key === "keep" && value && F.KEEPS.indexOf(value) < 0) return fail("keep must be one of: " + F.KEEPS.join(", "));
     if (!value) { delete cfg[key]; } else cfg[key] = value;
     writeConfig(cfg);
     console.log(key + " = " + (value || "(unset)") + (key === "via" ? "  ->  " + (commandFor(value || "claude") || "(paste door)") : ""));
@@ -257,10 +273,16 @@ const commands = {
     let busy = false;
     let ghCache = { at: 0, data: null };
     const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type, If-Match", "Access-Control-Expose-Headers": "ETag" };
+    let prefs = prefsFrom();
     function statusBody() {
-      return { ok: true, file: FILE, via: viaName, command: cmd, custom: !(viaName in S.PRESETS) && viaName !== "paste", presets: Object.keys(S.PRESETS).concat(["paste"]), github: ghUser, host: os.hostname() };
+      return {
+        ok: true, file: FILE, via: viaName, command: cmd, custom: !(viaName in S.PRESETS) && viaName !== "paste",
+        presets: Object.keys(S.PRESETS).concat(["paste"]), modes: S.MODES, keeps: F.KEEPS,
+        scribe: prefs.mode, extra: prefs.extra, keep: prefs.keep, github: ghUser, host: os.hostname()
+      };
     }
-    /* The app may switch between presets and the paste door. A custom command is set only on this machine: todo config via '<command>'. */
+    /* The app may switch presets, the paste door, the scribe mode, its extra instruction, and retention.
+       A custom shell command is set only on this machine: todo config via '<command>'. */
     function applyConfig(patch) {
       const cfg = readConfig();
       if (patch.via !== undefined) {
@@ -271,7 +293,11 @@ const commands = {
         if (!/^[A-Za-z0-9-]{0,39}$/.test(patch.github)) throw new Error("That is not a GitHub login");
         cfg.github = patch.github; ghUser = patch.github; ghCache = { at: 0, data: null };
       }
+      if (patch.scribe !== undefined) { if (!S.MODES[patch.scribe]) throw new Error("scribe must be one of: " + Object.keys(S.MODES).join(", ")); cfg.scribe = patch.scribe; }
+      if (patch.extra !== undefined) { if (typeof patch.extra !== "string") throw new Error("extra must be text"); cfg.extra = patch.extra.replace(/\s+/g, " ").trim().slice(0, S.EXTRA_MAX); }
+      if (patch.keep !== undefined) { if (F.KEEPS.indexOf(patch.keep) < 0) throw new Error("keep must be one of: " + F.KEEPS.join(", ")); cfg.keep = patch.keep; }
       writeConfig(cfg);
+      prefs = prefsFrom(cfg);
       console.log(new Date().toISOString() + " config " + JSON.stringify(patch));
     }
     /* Real contributions by day through the GitHub CLI's login. Cached for an hour. */
@@ -368,7 +394,7 @@ const commands = {
           busy = true;
           const started = Date.now();
           try {
-            const reply = await runAgentAsync(cmd, S.buildPrompt(raw));
+            const reply = await runAgentAsync(cmd, S.buildPrompt(raw, prefs));
             const cleaned = S.clean(reply);
             console.log(new Date().toISOString() + " scribe " + raw.length + " chars -> " + F.guard(raw, cleaned).items.length + " items in " + ((Date.now() - started) / 1000).toFixed(1) + "s");
             return json(res, 200, { reply, cleaned });
@@ -409,7 +435,8 @@ const commands = {
       "  todo prompt [file]        print the scribe prompt (default: your raw lines)",
       "  todo import [file]        merge items already in the todo format",
       "  todo serve [--port 8791] [--host 127.0.0.1] [--via claude] [--github login]",
-      "  todo config [via <preset|'command'> | github <login> | url <server URL>]",
+      "  todo config [via <preset|'command'> | scribe <unbundle|one|merge> | extra <instruction>",
+      "               | keep <gone|1h|today|week|forever> | github <login> | url <server URL>]",
       "  todo connect [--server URL]   print the setup prompt that connects any agent to this list",
       "  todo raw | todo path",
       "",

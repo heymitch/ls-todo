@@ -39,7 +39,8 @@
     return s;
   }
 
-  var DONE_RE = /(?:^|\s)Done:\s*(\d{4}-\d{2}-\d{2})\s*$/;
+  var DONE_RE = /(?:^|\s)Done:\s*(\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?)\s*$/;
+  var KEEPS = ["gone", "1h", "today", "week", "forever"];
 
   function parseItem(done, body) {
     var head = "", detail = "", source = "", raw = true, doneAt = "";
@@ -56,12 +57,32 @@
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function isoDate(dt) { return dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()); }
   function today(now) { return isoDate(now || new Date()); }
+  /* "2026-09-13T14:05", local time, minute precision. */
+  function now(dt) { dt = dt || new Date(); return isoDate(dt) + "T" + pad(dt.getHours()) + ":" + pad(dt.getMinutes()); }
+  function stampToDate(stamp) {
+    var m = String(stamp || "").match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/);
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0, 0, 0);
+  }
 
-  /* {"2026-09-13": 2, ...} from checked lines that carry a Done: date. */
+  /* {"2026-09-13": 2, ...} from checked lines that carry a Done: stamp. */
   function doneByDay(sections) {
     var m = {};
-    sections.forEach(function (s) { s.items.forEach(function (it) { if (it.done && it.doneAt) m[it.doneAt] = (m[it.doneAt] || 0) + 1; }); });
+    sections.forEach(function (s) { s.items.forEach(function (it) { if (it.done && it.doneAt) { var d = it.doneAt.slice(0, 10); m[d] = (m[d] || 0) + 1; } }); });
     return m;
+  }
+
+  /* Should a done line still show in the list? keep is one of KEEPS. An unstamped done line shows only under "forever". */
+  function doneVisible(it, keep, nowDate) {
+    if (!it.done) return true;
+    keep = KEEPS.indexOf(keep) > -1 ? keep : "today";
+    if (keep === "forever") return true;
+    if (keep === "gone" || !it.doneAt) return false;
+    var when = stampToDate(it.doneAt), at = nowDate || new Date();
+    if (!when) return false;
+    if (keep === "1h") return at - when < 3600000;
+    if (keep === "today") return isoDate(when) === isoDate(at);
+    return at - when < 7 * 86400000;
   }
 
   /* Text -> [{day: "Todo"|"Someday", items:[{done, head, detail, source, raw}]}]. Unknown lines are ignored. */
@@ -273,7 +294,7 @@
     TODO: TODO, SOMEDAY: SOMEDAY, ASK: ASK,
     parse: parse, parseAsks: parseAsks, parseReply: parseReply, serialize: serialize, serializeItem: serializeItem, sortSections: sortSections,
     merge: merge, absorb: absorb, rawItems: rawItems, rawText: rawText, countOpen: countOpen, normLine: normLine,
-    today: today, isoDate: isoDate, doneByDay: doneByDay,
+    today: today, now: now, isoDate: isoDate, doneByDay: doneByDay, doneVisible: doneVisible, KEEPS: KEEPS,
     rawLine: rawLine, structuredLine: structuredLine, plainItem: plainItem, isFormatted: isFormatted,
     wantsSomeday: wantsSomeday, wantsNow: wantsNow,
     guard: guard

@@ -60,7 +60,9 @@ An agent on the same machine does not need HTTP at all. It can edit the file or 
 
 **A note that knows what a checkbox is.** Tap a line, type, stop. It saves half a second after you stop typing and again when you leave the line. Return logs a new line. Backspace on an empty line deletes it. Escape leaves a line. On the desktop, `N` focuses the add line, `T` cycles themes, `,` opens settings.
 
-**The scribe.** One prompt in `scribe.js`. It takes your raw lines and asks for items in the file format, with rules that forbid adding names, numbers, dates, or sources, and a rule that breaks a project into two to five smaller outcomes. A deterministic guard then flags any number or content word in a scribed item that was not in your lines. Flags underline. They never block. A child of a broken-down line is expected to add ordinary words for its step, so only new numbers flag there.
+**The scribe.** One prompt in `scribe.js`. It takes your raw lines and asks for items in the file format, with rules that forbid adding names, numbers, dates, or sources. What it does with the lines is a setting with three choices: **break big lines down** into two to five smaller outcomes, **one line, one item**, or **merge lines about the same thing**. On top of that you can add one instruction of your own, such as "headlines under six words", and the scribe follows it unless it would mean inventing something. A deterministic guard then flags any number or content word in a scribed item that was not in your lines. Flags underline. They never block. A child of a broken-down line is expected to add ordinary words for its step, so only new numbers flag there.
+
+**Done lines.** Checking a box stamps the line with the time. How long it stays in the list is a setting: gone at once, an hour, today, a week, or forever. It always stays in the file and on the heat map.
 
 **When the scribe is not sure, it asks.** A line with two plausible outcomes comes back as a question with complete items as options, shown as a menu over the list. Number keys, `j` and `k`, Return, or a tap pick one. Escape keeps your words. At most two questions per scribe, never about wording.
 
@@ -80,13 +82,15 @@ An agent on the same machine does not need HTTP at all. It can edit the file or 
 * [ ] **RUST LEARNED.**
 ```
 
-A bold line is scribed. A plain line is raw. `Source:` is an optional pointer. `Done:` is stamped when you check the box. Files with other headings fold into Todo.
+A bold line is scribed. A plain line is raw. `Source:` is an optional pointer. `Done:` is stamped when you check the box, as a date or a date and time such as `2026-09-13T14:05`. Files with other headings fold into Todo.
 
 ## Settings
 
-A config file, rendered. Six rows.
+A config file, rendered. Eight rows, all saved on the server in `.todo.json` next to your file.
 
-- **agent.** A preset or the paste door, saved on the server in `.todo.json` next to your file. **test** asks the agent for one word.
+- **agent.** A preset or the paste door. **test** asks the agent for one word.
+- **scribe.** Break big lines down, one line one item, or merge lines about the same thing, plus your own instruction.
+- **done.** How long a checked line stays in the list: gone, an hour, today, a week, forever.
 - **github.** The login for the heat map.
 - **server.** The file and host. A second line takes another server's URL, for a copy of the page hosted elsewhere.
 - **connect.** The copy setup button described above.
@@ -107,6 +111,9 @@ todo prompt                           print the scribe prompt for your raw lines
 todo connect [--server URL]           print the setup brief for an agent
 todo import reply.md                  merge items already in the format
 todo config via hermes                agent preset, or a command in quotes
+todo config scribe one                unbundle | one | merge
+todo config extra "headlines under six words"
+todo config keep week                 gone | 1h | today | week | forever
 todo config github <login>
 todo config url https://...           the server's private URL, used by todo connect
 todo serve [--port 8791] [--host 127.0.0.1]

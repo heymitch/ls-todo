@@ -166,6 +166,37 @@ test("guard flags an invented number and an invented word, not the captured ones
   assert.match(flags, /new word jordan/);
 });
 
+test("Done stamps may carry a time; doneVisible honors the keep setting", () => {
+  const s = F.parse("## Todo\n\n* [x] **A.** Done: 2026-09-13T14:05\n* [x] **B.** Done: 2026-09-12\n* [x] **C.**\n");
+  assert.equal(s[0].items[0].doneAt, "2026-09-13T14:05");
+  assert.equal(F.serialize(s), "## Todo\n\n* [x] **A.** Done: 2026-09-13T14:05\n* [x] **B.** Done: 2026-09-12\n* [x] **C.**\n");
+  assert.deepEqual(F.doneByDay(s), { "2026-09-13": 1, "2026-09-12": 1 });
+  const at = new Date(2026, 8, 13, 14, 50);
+  const [a, b, c] = s[0].items;
+  assert.equal(F.doneVisible(a, "gone", at), false);
+  assert.equal(F.doneVisible(a, "1h", at), true);
+  assert.equal(F.doneVisible(a, "1h", new Date(2026, 8, 13, 15, 10)), false);
+  assert.equal(F.doneVisible(a, "today", at), true);
+  assert.equal(F.doneVisible(b, "today", at), false);
+  assert.equal(F.doneVisible(b, "week", at), true);
+  assert.equal(F.doneVisible(c, "week", at), false, "an unstamped done line only shows under forever");
+  assert.equal(F.doneVisible(c, "forever", at), true);
+  assert.equal(F.doneVisible({ done: false }, "gone", at), true);
+  assert.match(F.now(new Date(2026, 8, 13, 9, 5)), /^2026-09-13T09:05$/);
+});
+
+test("scribe prompt has three modes and takes the writer's own instruction", () => {
+  const un = S.buildPrompt("x");
+  assert.ok(un.includes("Break big lines down"));
+  const one = S.buildPrompt("x", { mode: "one" });
+  assert.ok(one.includes("One line, one item") && !one.includes("Break big lines down") && !one.includes("a big line exactly as written"));
+  const merge = S.buildPrompt("x", { mode: "merge", extra: 'headlines under six words, "please"' });
+  assert.ok(merge.includes("Merge lines that describe the same outcome"));
+  assert.ok(merge.includes("The writer adds this instruction: \"headlines under six words, 'please'\""));
+  assert.ok(!S.buildPrompt("x", { mode: "nonsense" }).includes("nonsense"));
+  assert.ok(Object.keys(S.MODES).join() === "unbundle,one,merge");
+});
+
 test("scribe prompt carries the raw lines and both sections; clean strips chatter and terminal codes", () => {
   const p = S.buildPrompt("buy milk\nmaybe learn rust someday");
   assert.ok(p.includes("## Someday"));
