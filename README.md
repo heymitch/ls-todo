@@ -40,7 +40,7 @@ The server has no login, so it should never face the internet. The clean way to 
 tailscale serve --bg --https=8790 http://127.0.0.1:8791
 ```
 
-With Tailscale on the phone, open `https://<machine>.<tailnet>.ts.net:8790/` and use Add to Home Screen. HTTPS matters here: it is what lets the page install as an app and use the microphone. To keep the server running after you log out or reboot, see `install/` for a launchd plist and a systemd unit.
+With Tailscale on the phone, open `https://<machine>.<tailnet>.ts.net:8790/` and use Add to Home Screen. HTTPS matters here: it is what lets the page install as an app. To keep the server running after you log out or reboot, see `install/` for a launchd plist and a systemd unit.
 
 ## Bring your agent
 
