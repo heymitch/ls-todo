@@ -5,7 +5,7 @@
   const F = window.TodoFormat, S = window.TodoScribe;
   const el = {};
   ["todo", "someday", "somedayItems", "openCount", "scribeStatus", "mic", "scribe",
-   "settingsWin", "storeNote", "exportBtn", "copyBtn", "importFile", "importBtn", "promptBtn", "rawEditor", "clearBtn",
+   "settingsWrap", "settingsWin", "storeNote", "exportBtn", "copyBtn", "importFile", "importBtn", "promptBtn", "rawEditor", "clearBtn",
    "presets", "agentNote", "githubLine", "serverV", "connectBtn", "connectNote",
    "settingsBtn", "toast", "toastMsg", "undoBtn", "themeName", "swatches",
    "askWrap", "ask", "askCount", "askRaw", "askOptions", "askOther", "askOtherLine", "askHint",
@@ -583,9 +583,11 @@
 
   /* ---------------- Settings: a config file, rendered ---------------- */
   el.settingsBtn.addEventListener("click", () => {
-    el.settingsWin.hidden = !el.settingsWin.hidden;
-    if (!el.settingsWin.hidden) { el.rawEditor.value = currentText(); renderSettings(); el.settingsWin.scrollIntoView({ block: "start" }); }
+    if (el.settingsWrap.hidden) openSettings(); else closeSettings();
   });
+  function openSettings() { el.rawEditor.value = currentText(); renderSettings(); el.settingsWrap.hidden = false; el.settingsWrap.scrollTop = 0; }
+  function closeSettings() { const a = document.activeElement; if (a && el.settingsWin.contains(a)) a.blur(); el.settingsWrap.hidden = true; }
+  el.settingsWrap.addEventListener("click", (e) => { if (e.target === el.settingsWrap) closeSettings(); });
   function statusWord() {
     if (store !== RemoteStore) return "paste door";
     return RemoteStore.hasAgent ? RemoteStore.via : "paste door";
@@ -724,7 +726,7 @@
     if (e.key === "n" || e.key === "N") { e.preventDefault(); focusLine({ add: true }); }
     if (e.key === ",") { e.preventDefault(); el.settingsBtn.click(); }
     if (e.key === "t" || e.key === "T") { cycleTheme(); }
-    if (e.key === "Escape") { el.settingsWin.hidden = true; }
+    if (e.key === "Escape") { closeSettings(); }
   });
 
   /* ---------------- Themes: data, not structure ---------------- */

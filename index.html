@@ -142,11 +142,7 @@ textarea:focus { border-color: var(--accent); outline: none; }
 
 /* ---- Desk: one window on the wallpaper ---- */
 .desk { display: grid; grid-template-columns: 1fr; gap: var(--gap); padding: var(--gap); align-items: start; }
-@media (min-width: 880px) {
-  .desk { grid-template-columns: minmax(0, 680px) minmax(0, 1fr); }
-  #listWin { grid-column: 1; }
-  #settingsWin { grid-column: 2; grid-row: 1; }
-}
+@media (min-width: 880px) { .desk { grid-template-columns: minmax(0, 680px); } }
 .win { background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s1) var(--s2) var(--s2); }
 .win:focus-within { border-color: var(--accent); }
 .win-body { display: grid; gap: var(--s2); padding-top: var(--s1); }
@@ -232,9 +228,16 @@ body.kb-aware .heat { bottom: auto; }
 .heat-legend .cell { width: 9px; height: 9px; }
 .heat-legend span { margin: 0 4px; }
 
-/* ---- Ask: an omarchy menu, not a dialog ---- */
-.askwrap { position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 72%, transparent); display: flex; align-items: center; justify-content: center; padding: var(--gap); }
-.ask { width: 100%; max-width: 560px; border-color: var(--accent); padding: 0; }
+/* ---- Floating windows: the ask menu and settings. Backdrop dims, the heat card steps out, one accent border. ---- */
+.askwrap {
+  position: fixed; inset: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 72%, transparent);
+  display: flex; align-items: safe center; justify-content: center; overflow: auto;
+  padding: calc(var(--gap) + env(safe-area-inset-top, 0px)) var(--gap) calc(var(--gap) + env(safe-area-inset-bottom, 0px));
+}
+.askwrap .win { border-color: var(--accent); }
+.ask { width: 100%; max-width: 560px; padding: 0; }
+.floating { width: 100%; max-width: 680px; }
+body:has(.askwrap:not([hidden])) .heat { visibility: hidden; }
 .ask-strip { display: flex; justify-content: space-between; padding: .45rem .9rem; border-bottom: 1px solid var(--border-subtle); font-size: .72rem; color: var(--fg-faint); }
 .ask-strip .path { color: var(--accent); }
 .ask-raw { padding: .8rem .9rem .5rem; color: var(--fg-muted); overflow-wrap: anywhere; }
@@ -249,7 +252,7 @@ body.kb-aware .heat { bottom: auto; }
 .ask-other { padding: 0 .9rem .4rem 44px; }
 .ask-other .line { border-bottom: 1px solid var(--border); min-height: 40px; padding-top: .3rem; padding-bottom: .3rem; }
 .ask-hint { padding: .5rem .9rem .6rem; font-size: .72rem; color: var(--fg-faint); border-top: 1px solid var(--border-subtle); }
-.askwrap:not([hidden]) ~ .desk, body:has(.askwrap:not([hidden])) .desk { opacity: .85; }
+body:has(.askwrap:not([hidden])) .desk { opacity: .85; }
 
 /* ---- Toast ---- */
 .toast {
@@ -291,7 +294,8 @@ body.kb-aware .heat { bottom: auto; }
     <div class="heat-legend" id="heatLegend"><span>less</span><div class="cell" data-l="0"></div><div class="cell" data-l="1"></div><div class="cell" data-l="2"></div><div class="cell" data-l="3"></div><div class="cell" data-l="4"></div><span>more</span></div>
   </section>
 
-  <section class="win" id="settingsWin" aria-label="Settings" hidden>
+  <div class="askwrap" id="settingsWrap" hidden>
+  <section class="win floating" id="settingsWin" role="dialog" aria-modal="true" aria-label="Settings">
     <div class="set">
       <div class="set-row">
         <span class="k">agent</span>
@@ -340,6 +344,7 @@ body.kb-aware .heat { bottom: auto; }
       </div>
     </div>
   </section>
+  </div>
 </main>
 
 <div class="askwrap" id="askWrap" hidden>

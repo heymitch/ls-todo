@@ -20,3 +20,17 @@ Uncommitted at session end:
  test/format.test.js | 23 +++++++++++++++++++++
  6 files changed, 144 insertions(+), 24 deletions(-)
 ```
+
+## 2026-09-13 12:32  (main, 1 uncommitted)
+
+Recent commits:
+```
+50d01c5 scribe breaks big lines into smaller outcomes; connect brief for agents; README explains Tailscale and the three agent doors
+561c035 todo: one list, one someday, one text file, bring your agent
+```
+
+Uncommitted at session end:
+```
+ index.html | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+```
