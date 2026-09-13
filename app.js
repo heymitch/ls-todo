@@ -386,7 +386,6 @@
     f.it.doneAt = f.it.done ? F.now() : "";
     saveNow();
     scheduleRender();
-    toast(f.it.done ? "Done. Another person can use it, read it, or buy it?" : "Reopened.", true);
   }
 
   /* ---------------- Toast + undo ---------------- */

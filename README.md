@@ -13,7 +13,6 @@ The agent's job is called the scribe. You log lines in your own words. When you 
 - **Outcomes, not tasks.** `call alex about the deck` becomes `ALEX CALLED ABOUT THE DECK.` A headline states a checkable state of the world.
 - **Big lines get broken down.** `launch the course by oct 1` becomes `COURSE OUTLINE WRITTEN.`, `COURSE LESSONS RECORDED.`, `COURSE LESSONS EDITED AND UPLOADED.`, `COURSE LAUNCHED BY OCT 1.` In order, first one doable today, last one finishes the big line.
 - **One place, one someday.** No projects, no tags, no priorities, no dates. Write `someday`, `maybe`, `sometime`, or `later` in a line and it moves down. Write `now` or `today` and it comes back.
-- **Done has a definition.** Checking a box asks: another person can use it, read it, or buy it?
 - **Type first, clean later.** Return logs the line as written. Scribe is a button for whenever you want the logged lines cleaned. Undo is the safety net.
 - **The file is the truth.** Export is the file. Import is the file. Agents edit the file.
 
