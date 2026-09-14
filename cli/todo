@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* todo — the CLI door. One text file, any agent.
+/* LS todo — the CLI door. One text file, any agent.
    File: $TODO_FILE or ~/todo.md
    Agent: --via <preset|command>, or $TODO_AGENT. The command gets the prompt on stdin and prints the result. */
 "use strict";
@@ -321,7 +321,7 @@ const commands = {
       const unit = path.join(dir, "todo-serve.service");
       fs.mkdirSync(dir, { recursive: true });
       const envLines = ["Environment=PATH=" + process.env.PATH].concat(["TODO_FILE", "TODO_CONFIG"].filter((k) => process.env[k]).map((k) => "Environment=" + k + "=" + process.env[k]));
-      fs.writeFileSync(unit, ["[Unit]", "Description=todo serve", "", "[Service]", "ExecStart=" + process.execPath + " " + path.join(APP_DIR, "cli", "todo") + " serve --port " + port, "WorkingDirectory=" + APP_DIR].concat(envLines, ["Restart=always", "RestartSec=2", "", "[Install]", "WantedBy=default.target", ""]).join("\n"));
+      fs.writeFileSync(unit, ["[Unit]", "Description=LS todo", "", "[Service]", "ExecStart=" + process.execPath + " " + path.join(APP_DIR, "cli", "todo") + " serve --port " + port, "WorkingDirectory=" + APP_DIR].concat(envLines, ["Restart=always", "RestartSec=2", "", "[Install]", "WantedBy=default.target", ""]).join("\n"));
       spawnSync("systemctl", ["--user", "daemon-reload"], { encoding: "utf8" });
       const e = spawnSync("systemctl", ["--user", "enable", "--now", "todo-serve"], { encoding: "utf8" });
       if (e.status !== 0) return fail("systemctl enable failed: " + (e.stderr || e.stdout));
@@ -561,7 +561,7 @@ const commands = {
 
   help() {
     console.log([
-      "todo — one list, one someday, one text file. Bring your agent.",
+      "LS todo — one list, one someday, one text file. Bring your agent.",
       "",
       "  todo                      list open items, numbered",
       "  todo list --all           include done items",

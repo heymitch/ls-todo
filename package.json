@@ -1,5 +1,5 @@
 {
-  "name": "todo",
+  "name": "ls-todo",
   "version": "0.1.0",
   "private": true,
   "description": "One list. One someday. One text file. Bring your agent.",
@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/heymitch/todo"
+    "url": "https://github.com/heymitch/ls-todo"
   },
   "engines": { "node": ">=20" },
   "bin": { "todo": "cli/todo" },

@@ -6,11 +6,11 @@
 #   To keep it running when you are logged out: loginctl enable-linger $USER
 
 [Unit]
-Description=todo serve
+Description=LS todo
 
 [Service]
-ExecStart=/usr/bin/node /home/YOU/todo/cli/todo serve
-WorkingDirectory=/home/YOU/todo
+ExecStart=/usr/bin/node /home/YOU/ls-todo/cli/todo serve
+WorkingDirectory=/home/YOU/ls-todo
 Environment=PATH=/home/YOU/.local/bin:/usr/local/bin:/usr/bin:/bin
 Restart=always
 RestartSec=2

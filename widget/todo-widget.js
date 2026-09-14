@@ -1,6 +1,6 @@
-// todo — home-screen widget for Scriptable (https://scriptable.app, free).
-// 1. Install Scriptable. 2. New script, paste this file, name it "todo".
-// 3. Add a Scriptable widget to the home screen, choose the "todo" script.
+// LS todo — home-screen widget for Scriptable (https://scriptable.app, free).
+// 1. Install Scriptable. 2. New script, paste this file, name it "LS todo".
+// 3. Add a Scriptable widget to the home screen, choose the "LS todo" script.
 // The phone must reach your todo server (Tailscale on). Tap the widget to open the app.
 
 const SERVER = "https://your-machine.your-tailnet.ts.net:8790"; // your todo serve URL
@@ -25,11 +25,11 @@ try {
 const mono = (s) => Font.regularMonospacedSystemFont(s);
 const bold = (s) => Font.boldMonospacedSystemFont(s);
 
-// title row: "todo" + open count
+// title row: "LS todo" + open count
 const head = w.addStack();
 head.centerAlignContent();
-const t1 = head.addText("to"); t1.font = bold(13); t1.textColor = FG;
-const t2 = head.addText("do"); t2.font = bold(13); t2.textColor = ACCENT;
+const t1 = head.addText("LS "); t1.font = bold(13); t1.textColor = FG;
+const t2 = head.addText("todo"); t2.font = bold(13); t2.textColor = ACCENT;
 head.addSpacer();
 if (data) {
   const c = head.addText(data.open + " open"); c.font = mono(11); c.textColor = FAINT;

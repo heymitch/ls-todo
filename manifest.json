@@ -1,6 +1,6 @@
 {
-  "name": "todo",
-  "short_name": "todo",
+  "name": "LS todo",
+  "short_name": "LS todo",
   "description": "One list, one someday, one text file. Bring your agent.",
   "start_url": "./",
   "scope": "./",

@@ -1,10 +1,12 @@
-# todo
+# LS todo
 
 One list. One someday. One text file. Bring your agent.
 
-<img src="docs/phone.jpg" alt="todo on a phone: a short list with square boxes, a scribe button, and a heat map of done days" width="380">
+<img src="docs/phone.jpg" alt="LS todo on a phone: a short list with square boxes, a scribe button, and a heat map of done days" width="380">
 
 A to-do list that behaves like a note. Every line is editable in place and saves when you stop typing. Boxes are the only controls. The list is one plain-text file, so the phone app, the command line, and any AI agent you already use can all read and write the same thing.
+
+The app is LS todo. The command stays `todo`.
 
 The agent's job is called the scribe. You log lines in your own words. When you ask, the scribe rewrites them into outcomes, breaks a big line into the smaller outcomes that get it done, and asks you instead of guessing when a line could go two ways. It never adds a name, number, or date you did not write.
 
@@ -21,11 +23,11 @@ The agent's job is called the scribe. You log lines in your own words. When you 
 Paste this into the agent you already use, on the computer that will hold the list. Claude Code, Codex, Hermes, and Grok all work. It takes about a minute.
 
 ```
-Install todo for me from https://github.com/heymitch/todo
+Install LS todo for me from https://github.com/heymitch/ls-todo
 
 1. Check `node --version` is 20 or newer. If not, install Node first and tell me.
-2. Clone the repo to ~/todo, or `git pull` if it is already there.
-3. Run: node ~/todo/cli/todo install --via <your own name: claude, codex, hermes, or grok>
+2. Clone the repo to ~/ls-todo, or `git pull` if it is already there.
+3. Run: node ~/ls-todo/cli/todo install --via <your own name: claude, codex, hermes, or grok>
    It puts the `todo` command on my PATH, registers the server to start at login,
    publishes it on my Tailscale network if Tailscale is installed, and prints the URLs.
 4. Show me the tailnet URL it printed and the phone steps. If it said Tailscale is
@@ -33,7 +35,7 @@ Install todo for me from https://github.com/heymitch/todo
 5. Run `todo` and show me the list to prove it works.
 ```
 
-That is the whole install. If you would rather do it by hand: Node 20 or newer, `git clone https://github.com/heymitch/todo`, `node todo/cli/todo install`. Or skip the service entirely with `node cli/todo serve` and open http://127.0.0.1:8791.
+That is the whole install. If you would rather do it by hand: Node 20 or newer, `git clone https://github.com/heymitch/ls-todo`, `node ls-todo/cli/todo install`. Or skip the service entirely with `node cli/todo serve` and open http://127.0.0.1:8791.
 
 Then open settings in the app and pick the agent that is installed on this machine: `claude` for Claude Code, `codex`, `hermes`, or `grok`. Press **test** to see it answer. If none of those is installed, pick `paste`: the scribe button copies its prompt, you paste it into any AI, and you paste the reply back into a line.
 

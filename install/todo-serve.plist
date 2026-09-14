@@ -13,11 +13,11 @@
   <key>ProgramArguments</key>
   <array>
     <string>/usr/local/bin/node</string>
-    <string>/Users/YOU/todo/cli/todo</string>
+    <string>/Users/YOU/ls-todo/cli/todo</string>
     <string>serve</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/YOU/todo</string>
+  <string>/Users/YOU/ls-todo</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
